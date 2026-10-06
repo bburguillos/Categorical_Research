@@ -1,7 +1,4 @@
-import base64
-import json
-import re
-
+import base64, json, re
 import pandas as pd
 import requests
 import streamlit as st
@@ -12,61 +9,54 @@ st.set_page_config(
     layout="wide"
 )
 
-ESPN_NBA_BASE = "https://site.api.espn.com/apis/site/v2/sports/basketball/nba"
-MLB_API_BASE = "https://statsapi.mlb.com/api/v1"
+NBA_BASE = "https://site.api.espn.com/apis/site/v2/sports/basketball/nba"
+MLB_BASE = "https://statsapi.mlb.com/api/v1"
+NHL_BASE = "https://api-web.nhle.com/v1"
 
-# ----------------------------
-# Styling
-# ----------------------------
 st.markdown("""
 <style>
-    .block-container {padding-top: 1.2rem; padding-bottom: 2rem;}
-    .big-title {
-        font-size: 2.25rem;
-        font-weight: 800;
-        margin-bottom: 0.1rem;
-    }
-    .subtitle {
-        font-size: 1.05rem;
-        opacity: .8;
-        margin-bottom: 1rem;
-    }
-    .step-card {
-        border: 1px solid rgba(120,120,120,.25);
-        border-radius: 14px;
-        padding: 14px 16px;
-        margin-bottom: 12px;
-    }
-    .good {
-        border-left: 5px solid #2e7d32;
-        padding: 10px 12px;
-        border-radius: 8px;
-        background: rgba(46,125,50,.08);
-    }
+.block-container{padding-top:1.2rem;padding-bottom:2rem}
+.big-title{font-size:2.25rem;font-weight:800;margin-bottom:.1rem}
+.subtitle{font-size:1.05rem;opacity:.8;margin-bottom:1rem}
+.step-card{
+    border:1px solid rgba(120,120,120,.25);
+    border-radius:14px;
+    padding:14px 16px;
+    margin-bottom:12px
+}
+.good{
+    border-left:5px solid #2e7d32;
+    padding:10px 12px;
+    border-radius:8px;
+    background:rgba(46,125,50,.08)
+}
 </style>
 """, unsafe_allow_html=True)
 
-# ----------------------------
-# General helpers
-# ----------------------------
+
+# ============================================================
+# GENERAL HELPERS
+# ============================================================
+
 def safe_get(url, params=None, timeout=25):
-    headers = {
-        "User-Agent": "Mozilla/5.0",
-        "Accept": "application/json,text/plain,*/*",
-    }
 
     r = requests.get(
         url,
         params=params,
-        headers=headers,
+        headers={
+            "User-Agent": "Mozilla/5.0",
+            "Accept": "application/json,text/plain,*/*"
+        },
         timeout=timeout
     )
 
     r.raise_for_status()
+
     return r.json()
 
 
 def norm(s):
+
     return re.sub(
         r"[^a-z0-9]",
         "",
@@ -75,6 +65,7 @@ def norm(s):
 
 
 def as_number(v):
+
     if v is None:
         return None
 
@@ -92,59 +83,70 @@ def as_number(v):
             s
         )
     ):
+
         s = s.split("-")[0]
 
     try:
+
         return float(s)
-    except Exception:
+
+    except:
+
         return None
 
 
 def parse_pct(v):
+
     x = as_number(v)
 
     if x is None:
         return None
 
-    return x * 100 if x <= 1.0 else x
+    return x * 100 if x <= 1 else x
+
+
+def percent(n, d):
+
+    return (
+        0.0
+        if d == 0
+        else 100 * n / d
+    )
 
 
 def encode_task(payload):
+
     raw = json.dumps(
         payload,
         separators=(",", ":")
-    ).encode("utf-8")
+    ).encode()
 
     return (
         base64
         .urlsafe_b64encode(raw)
-        .decode("utf-8")
+        .decode()
         .rstrip("=")
     )
 
 
 def decode_task(code):
-    try:
-        padding = "=" * (-len(code) % 4)
 
-        raw = base64.urlsafe_b64decode(
-            code + padding
+    try:
+
+        raw = (
+            base64
+            .urlsafe_b64decode(
+                code + "=" * (-len(code) % 4)
+            )
         )
 
         return json.loads(
-            raw.decode("utf-8")
+            raw.decode()
         )
 
-    except Exception:
+    except:
+
         return None
-
-
-def percent(n, d):
-    return (
-        0.0
-        if d == 0
-        else 100.0 * n / d
-    )
 
 
 def two_way(df, a1, a2):
@@ -179,7 +181,7 @@ def two_way(df, a1, a2):
         out.sum(axis=1)
     )
 
-    total_row = pd.DataFrame(
+    total = pd.DataFrame(
         [[
             out["Win"].sum(),
             out["Did Not Win"].sum(),
@@ -196,7 +198,7 @@ def two_way(df, a1, a2):
     return pd.concat(
         [
             out,
-            total_row
+            total
         ]
     )
 
@@ -212,7 +214,7 @@ def two_way(df, a1, a2):
 def get_nba_teams():
 
     data = safe_get(
-        f"{ESPN_NBA_BASE}/teams"
+        f"{NBA_BASE}/teams"
     )
 
     teams = []
@@ -247,29 +249,32 @@ def get_nba_teams():
                 ):
 
                     teams.append({
-                        "id": str(t["id"]),
-                        "name": t["displayName"]
+                        "id":
+                            str(t["id"]),
+
+                        "name":
+                            t["displayName"]
                     })
 
     return sorted(
         teams,
-        key=lambda x: x["name"]
+        key=lambda x:
+            x["name"]
     )
 
 
-def nba_season_end_year(label):
+def nba_season_id(label):
 
     m = re.match(
         r"(\d{4})-(\d{2})",
         label
     )
 
-    if not m:
-        return int(label)
-
-    return int(
-        m.group(1)
-    ) + 1
+    return (
+        int(m.group(1)) + 1
+        if m
+        else int(label)
+    )
 
 
 @st.cache_data(
@@ -278,28 +283,94 @@ def nba_season_end_year(label):
 )
 def get_nba_schedule(
     team_id,
-    season_label
+    season
 ):
 
-    season = nba_season_end_year(
-        season_label
-    )
-
-    data = safe_get(
-        f"{ESPN_NBA_BASE}/teams/{team_id}/schedule",
+    return safe_get(
+        f"{NBA_BASE}/teams/{team_id}/schedule",
         params={
-            "season": season,
-            "seasontype": 2
+            "season":
+                nba_season_id(
+                    season
+                ),
+            "seasontype":
+                2
         }
-    )
-
-    return data.get(
+    ).get(
         "events",
         []
     )
 
 
-def nba_competitors(event):
+@st.cache_data(
+    ttl=86400,
+    show_spinner=False
+)
+def get_nba_summary(
+    event_id
+):
+
+    return safe_get(
+        f"{NBA_BASE}/summary",
+        params={
+            "event":
+                event_id
+        }
+    )
+
+
+def nba_score(v):
+
+    if isinstance(
+        v,
+        (int, float)
+    ):
+
+        return float(v)
+
+    if isinstance(
+        v,
+        str
+    ):
+
+        try:
+
+            return float(v)
+
+        except:
+
+            return None
+
+    if isinstance(
+        v,
+        dict
+    ):
+
+        for k in [
+            "value",
+            "displayValue",
+            "score"
+        ]:
+
+            if k in v:
+
+                try:
+
+                    return float(
+                        v[k]
+                    )
+
+                except:
+
+                    pass
+
+    return None
+
+
+def nba_core(
+    event,
+    team_id
+):
 
     comps = event.get(
         "competitions",
@@ -307,78 +378,20 @@ def nba_competitors(event):
     )
 
     if not comps:
-        return []
 
-    return comps[0].get(
+        return None
+
+    competitors = comps[0].get(
         "competitors",
         []
     )
 
-
-def nba_score_number(score_obj):
-
-    if score_obj is None:
-        return None
-
-    if isinstance(
-        score_obj,
-        (int, float)
-    ):
-        return float(score_obj)
-
-    if isinstance(
-        score_obj,
-        str
-    ):
-
-        try:
-            return float(score_obj)
-
-        except Exception:
-            return None
-
-    if isinstance(
-        score_obj,
-        dict
-    ):
-
-        for key in [
-            "value",
-            "displayValue",
-            "score"
-        ]:
-
-            if key in score_obj:
-
-                try:
-                    return float(
-                        score_obj[key]
-                    )
-
-                except Exception:
-                    pass
-
-    return None
-
-
-def nba_game_core(
-    event,
-    team_id
-):
-
-    competitors = nba_competitors(
-        event
-    )
-
-    if len(competitors) < 2:
-        return None
-
-    team_comp = None
-    opp_comp = None
+    team = None
+    opp = None
 
     for c in competitors:
 
-        cid = str(
+        if str(
             c.get(
                 "team",
                 {}
@@ -386,62 +399,48 @@ def nba_game_core(
                 "id",
                 ""
             )
-        )
+        ) == str(team_id):
 
-        if cid == str(team_id):
-
-            team_comp = c
+            team = c
 
         else:
 
-            opp_comp = c
+            opp = c
 
-    if not team_comp or not opp_comp:
+    if not team or not opp:
+
         return None
 
-    team_score_raw = nba_score_number(
-        team_comp.get("score")
+    ts = nba_score(
+        team.get(
+            "score"
+        )
     )
 
-    opp_score_raw = nba_score_number(
-        opp_comp.get("score")
+    os = nba_score(
+        opp.get(
+            "score"
+        )
     )
 
     if (
-        team_score_raw is None
-        or opp_score_raw is None
+        ts is None
+        or os is None
     ):
 
         return None
 
-    team_score = int(
-        round(team_score_raw)
+    ts = int(
+        round(ts)
     )
 
-    opp_score = int(
-        round(opp_score_raw)
-    )
-
-    result = (
-        "Win"
-        if (
-            team_comp.get("winner") is True
-            or team_score > opp_score
-        )
-        else "Did Not Win"
-    )
-
-    home_away = (
-        "Home"
-        if team_comp.get(
-            "homeAway"
-        ) == "home"
-        else "Away"
+    os = int(
+        round(os)
     )
 
     try:
 
-        date_display = (
+        date = (
             pd.to_datetime(
                 event.get(
                     "date",
@@ -453,9 +452,9 @@ def nba_game_core(
             )
         )
 
-    except Exception:
+    except:
 
-        date_display = str(
+        date = str(
             event.get(
                 "date",
                 ""
@@ -463,52 +462,62 @@ def nba_game_core(
         )[:10]
 
     return {
-        "event_id": str(
-            event.get(
-                "id",
-                ""
-            )
-        ),
-        "date": date_display,
-        "opponent": (
-            opp_comp
-            .get(
+        "event_id":
+            str(
+                event.get(
+                    "id",
+                    ""
+                )
+            ),
+
+        "date":
+            date,
+
+        "opponent":
+            opp.get(
                 "team",
                 {}
-            )
-            .get(
+            ).get(
                 "displayName",
                 "Opponent"
+            ),
+
+        "home_away":
+            (
+                "Home"
+                if team.get(
+                    "homeAway"
+                ) == "home"
+                else "Away"
+            ),
+
+        "team_score":
+            ts,
+
+        "opp_score":
+            os,
+
+        "result":
+            (
+                "Win"
+                if (
+                    team.get(
+                        "winner"
+                    ) is True
+                    or ts > os
+                )
+                else "Did Not Win"
             )
-        ),
-        "home_away": home_away,
-        "team_score": team_score,
-        "opp_score": opp_score,
-        "result": result,
     }
 
 
-@st.cache_data(
-    ttl=86400,
-    show_spinner=False
-)
-def get_nba_summary(event_id):
-
-    return safe_get(
-        f"{ESPN_NBA_BASE}/summary",
-        params={
-            "event": event_id
-        }
-    )
-
-
-def nba_find_box(
+def nba_box(
     summary,
     team_id,
     opponent=False
 ):
 
-    teams = (
+    for tb in (
         summary
         .get(
             "boxscore",
@@ -518,9 +527,7 @@ def nba_find_box(
             "teams",
             []
         )
-    )
-
-    for tb in teams:
+    ):
 
         tid = str(
             tb.get(
@@ -550,61 +557,70 @@ def nba_find_box(
     return None
 
 
-def nba_stat_map(team_box):
+def stat_map(box):
 
     out = {}
 
-    if not team_box:
+    if not box:
+
         return out
 
-    for s in team_box.get(
+    for s in box.get(
         "statistics",
         []
     ):
 
-        value = s.get(
+        val = s.get(
             "displayValue",
-            s.get("value")
+            s.get(
+                "value"
+            )
         )
 
-        candidates = [
-            s.get("name", ""),
-            s.get("displayName", ""),
-            s.get("label", ""),
-            s.get("abbreviation", "")
-        ]
+        for k in [
+            "name",
+            "displayName",
+            "label",
+            "abbreviation"
+        ]:
 
-        for c in candidates:
+            if s.get(k):
 
-            if c:
-                out[norm(c)] = value
+                out[
+                    norm(
+                        s[k]
+                    )
+                ] = val
 
     return out
 
 
-def first_stat_value(
+def find_stat(
     stats,
     keys
 ):
 
     for key in keys:
 
-        nk = norm(key)
+        if norm(key) in stats:
 
-        if nk in stats:
-            return stats[nk]
+            return stats[
+                norm(key)
+            ]
 
     for k, v in stats.items():
 
-        for key in keys:
+        if any(
+            norm(key) in k
+            for key in keys
+        ):
 
-            if norm(key) in k:
-                return v
+            return v
 
     return None
 
 
-def nba_halftime_points(
+def nba_halftime(
     summary,
     team_id
 ):
@@ -622,6 +638,7 @@ def nba_halftime_points(
     )
 
     if not comps:
+
         return None, None
 
     team_lines = None
@@ -631,16 +648,6 @@ def nba_halftime_points(
         "competitors",
         []
     ):
-
-        tid = str(
-            c.get(
-                "team",
-                {}
-            ).get(
-                "id",
-                ""
-            )
-        )
 
         vals = []
 
@@ -660,11 +667,19 @@ def nba_halftime_points(
                     )
                 )
 
-            except Exception:
+            except:
 
                 vals.append(0)
 
-        if tid == str(team_id):
+        if str(
+            c.get(
+                "team",
+                {}
+            ).get(
+                "id",
+                ""
+            )
+        ) == str(team_id):
 
             team_lines = vals
 
@@ -673,8 +688,8 @@ def nba_halftime_points(
             opp_lines = vals
 
     if (
-        team_lines is None
-        or opp_lines is None
+        not team_lines
+        or not opp_lines
         or len(team_lines) < 2
         or len(opp_lines) < 2
     ):
@@ -682,170 +697,186 @@ def nba_halftime_points(
         return None, None
 
     return (
-        sum(team_lines[:2]),
-        sum(opp_lines[:2])
+        sum(
+            team_lines[:2]
+        ),
+        sum(
+            opp_lines[:2]
+        )
     )
 
 
-def nba_metric_values(
+def nba_metrics(
     summary,
     team_id
 ):
 
-    ts = nba_stat_map(
-        nba_find_box(
+    ts = stat_map(
+        nba_box(
             summary,
             team_id
         )
     )
 
-    os = nba_stat_map(
-        nba_find_box(
+    os = stat_map(
+        nba_box(
             summary,
             team_id,
-            opponent=True
+            True
         )
     )
 
-    team_3pm = as_number(
-        first_stat_value(
-            ts,
-            [
-                "threePointFieldGoalsMade",
-                "3PT Made",
-                "3PM",
-                "threePointersMade",
-                "three point field goals made"
-            ]
-        )
-    )
-
-    opp_3pm = as_number(
-        first_stat_value(
-            os,
-            [
-                "threePointFieldGoalsMade",
-                "3PT Made",
-                "3PM",
-                "threePointersMade",
-                "three point field goals made"
-            ]
-        )
-    )
-
-    team_to = as_number(
-        first_stat_value(
-            ts,
-            [
-                "turnovers",
-                "TO"
-            ]
-        )
-    )
-
-    opp_to = as_number(
-        first_stat_value(
-            os,
-            [
-                "turnovers",
-                "TO"
-            ]
-        )
-    )
-
-    team_reb = as_number(
-        first_stat_value(
-            ts,
-            [
-                "totalRebounds",
-                "rebounds",
-                "REB",
-                "total rebounds"
-            ]
-        )
-    )
-
-    opp_reb = as_number(
-        first_stat_value(
-            os,
-            [
-                "totalRebounds",
-                "rebounds",
-                "REB",
-                "total rebounds"
-            ]
-        )
-    )
-
-    team_ast = as_number(
-        first_stat_value(
-            ts,
-            [
-                "assists",
-                "AST"
-            ]
-        )
-    )
-
-    team_fg = parse_pct(
-        first_stat_value(
-            ts,
-            [
-                "fieldGoalPct",
-                "field goal percentage",
-                "FG%"
-            ]
-        )
-    )
-
-    ht_team, ht_opp = (
-        nba_halftime_points(
-            summary,
-            team_id
-        )
+    ht, ho = nba_halftime(
+        summary,
+        team_id
     )
 
     return {
-        "team_3pm": team_3pm,
-        "opp_3pm": opp_3pm,
-        "team_turnovers": team_to,
-        "opp_turnovers": opp_to,
-        "team_rebounds": team_reb,
-        "opp_rebounds": opp_reb,
-        "team_assists": team_ast,
-        "team_fg_pct": team_fg,
-        "halftime_team": ht_team,
-        "halftime_opp": ht_opp,
+
+        "team_3pm":
+            as_number(
+                find_stat(
+                    ts,
+                    [
+                        "threePointFieldGoalsMade",
+                        "3PT Made",
+                        "3PM",
+                        "threePointersMade"
+                    ]
+                )
+            ),
+
+        "opp_3pm":
+            as_number(
+                find_stat(
+                    os,
+                    [
+                        "threePointFieldGoalsMade",
+                        "3PT Made",
+                        "3PM",
+                        "threePointersMade"
+                    ]
+                )
+            ),
+
+        "team_turnovers":
+            as_number(
+                find_stat(
+                    ts,
+                    [
+                        "turnovers",
+                        "TO"
+                    ]
+                )
+            ),
+
+        "opp_turnovers":
+            as_number(
+                find_stat(
+                    os,
+                    [
+                        "turnovers",
+                        "TO"
+                    ]
+                )
+            ),
+
+        "team_rebounds":
+            as_number(
+                find_stat(
+                    ts,
+                    [
+                        "totalRebounds",
+                        "rebounds",
+                        "REB"
+                    ]
+                )
+            ),
+
+        "opp_rebounds":
+            as_number(
+                find_stat(
+                    os,
+                    [
+                        "totalRebounds",
+                        "rebounds",
+                        "REB"
+                    ]
+                )
+            ),
+
+        "team_assists":
+            as_number(
+                find_stat(
+                    ts,
+                    [
+                        "assists",
+                        "AST"
+                    ]
+                )
+            ),
+
+        "team_fg_pct":
+            parse_pct(
+                find_stat(
+                    ts,
+                    [
+                        "fieldGoalPct",
+                        "field goal percentage",
+                        "FG%"
+                    ]
+                )
+            ),
+
+        "halftime_team":
+            ht,
+
+        "halftime_opp":
+            ho
     }
 
 
 NBA_PRESETS = {
 
     "Home vs. Away": {
-        "type": "home_away",
-        "a1": "Home",
-        "a2": "Away",
-        "evidence_label": "Location",
+        "type":
+            "home_away",
+        "a1":
+            "Home",
+        "a2":
+            "Away",
+        "evidence_label":
+            "Location",
         "question":
             "Does playing at home appear associated with whether the team wins?"
     },
 
     "Team scores at least 110 points": {
-        "type": "team_points_threshold",
-        "threshold": 110,
-        "a1": "110 Plus Points",
-        "a2": "Under 110",
-        "evidence_label": "Team points",
+        "type":
+            "team_points",
+        "threshold":
+            110,
+        "a1":
+            "110 Plus Points",
+        "a2":
+            "Under 110",
+        "evidence_label":
+            "Team points",
         "question":
             "Is scoring 110 or more points associated with whether the team wins?"
     },
 
     "More 3-pointers than opponent": {
-        "type": "compare_more",
-        "metric_team": "team_3pm",
-        "metric_opp": "opp_3pm",
-        "a1": "More 3-Pointers",
-        "a2": "Not More 3-Pointers",
+        "type":
+            "more",
+        "m1":
+            "team_3pm",
+        "m2":
+            "opp_3pm",
+        "a1":
+            "More 3-Pointers",
+        "a2":
+            "Not More 3-Pointers",
         "evidence_label":
             "Team 3PM vs. opponent 3PM",
         "question":
@@ -853,11 +884,16 @@ NBA_PRESETS = {
     },
 
     "Fewer turnovers than opponent": {
-        "type": "compare_fewer",
-        "metric_team": "team_turnovers",
-        "metric_opp": "opp_turnovers",
-        "a1": "Fewer Turnovers",
-        "a2": "Not Fewer Turnovers",
+        "type":
+            "fewer",
+        "m1":
+            "team_turnovers",
+        "m2":
+            "opp_turnovers",
+        "a1":
+            "Fewer Turnovers",
+        "a2":
+            "Not Fewer Turnovers",
         "evidence_label":
             "Team turnovers vs. opponent turnovers",
         "question":
@@ -865,22 +901,33 @@ NBA_PRESETS = {
     },
 
     "Field goal percentage at least 50%": {
-        "type": "metric_threshold",
-        "metric_team": "team_fg_pct",
-        "threshold": 50,
-        "a1": "50 Percent Plus FG",
-        "a2": "Under 50 Percent",
-        "evidence_label": "Team FG%",
+        "type":
+            "metric",
+        "metric":
+            "team_fg_pct",
+        "threshold":
+            50,
+        "a1":
+            "50 Percent Plus FG",
+        "a2":
+            "Under 50 Percent",
+        "evidence_label":
+            "Team FG%",
         "question":
             "Is shooting at least 50 percent from the field associated with whether the team wins?"
     },
 
     "More rebounds than opponent": {
-        "type": "compare_more",
-        "metric_team": "team_rebounds",
-        "metric_opp": "opp_rebounds",
-        "a1": "More Rebounds",
-        "a2": "Not More Rebounds",
+        "type":
+            "more",
+        "m1":
+            "team_rebounds",
+        "m2":
+            "opp_rebounds",
+        "a1":
+            "More Rebounds",
+        "a2":
+            "Not More Rebounds",
         "evidence_label":
             "Team rebounds vs. opponent rebounds",
         "question":
@@ -888,47 +935,70 @@ NBA_PRESETS = {
     },
 
     "Led at halftime": {
-        "type": "compare_more",
-        "metric_team": "halftime_team",
-        "metric_opp": "halftime_opp",
-        "a1": "Led at Halftime",
-        "a2": "Did Not Lead at Halftime",
-        "evidence_label": "Halftime score",
+        "type":
+            "more",
+        "m1":
+            "halftime_team",
+        "m2":
+            "halftime_opp",
+        "a1":
+            "Led at Halftime",
+        "a2":
+            "Did Not Lead at Halftime",
+        "evidence_label":
+            "Halftime score",
         "question":
             "Does leading at halftime appear associated with whether the team wins?"
     },
 
     "Made at least 12 three-pointers": {
-        "type": "metric_threshold",
-        "metric_team": "team_3pm",
-        "threshold": 12,
-        "a1": "12 Plus 3-Pointers",
-        "a2": "Fewer Than 12",
-        "evidence_label": "Team 3PM",
+        "type":
+            "metric",
+        "metric":
+            "team_3pm",
+        "threshold":
+            12,
+        "a1":
+            "12 Plus 3-Pointers",
+        "a2":
+            "Fewer Than 12",
+        "evidence_label":
+            "Team 3PM",
         "question":
             "Is making 12 or more three-pointers associated with whether the team wins?"
     },
 
     "Held opponent under 110 points": {
-        "type": "opp_points_under",
-        "threshold": 110,
-        "a1": "Opponent Under 110",
-        "a2": "Opponent 110 Plus",
-        "evidence_label": "Opponent points",
+        "type":
+            "opp_under",
+        "threshold":
+            110,
+        "a1":
+            "Opponent Under 110",
+        "a2":
+            "Opponent 110 Plus",
+        "evidence_label":
+            "Opponent points",
         "question":
             "Is holding the opponent under 110 points associated with whether the team wins?"
     },
 
     "At least 25 assists": {
-        "type": "metric_threshold",
-        "metric_team": "team_assists",
-        "threshold": 25,
-        "a1": "25 Plus Assists",
-        "a2": "Under 25 Assists",
-        "evidence_label": "Team assists",
+        "type":
+            "metric",
+        "metric":
+            "team_assists",
+        "threshold":
+            25,
+        "a1":
+            "25 Plus Assists",
+        "a2":
+            "Under 25 Assists",
+        "evidence_label":
+            "Team assists",
         "question":
             "Are 25 or more team assists associated with whether the team wins?"
-    },
+    }
 }
 
 
@@ -940,82 +1010,87 @@ def nba_classify(
     t = cfg["type"]
 
     if t == "home_away":
-        return row["home_away"]
 
-    if t == "team_points_threshold":
+        return row[
+            "home_away"
+        ]
 
-        return (
-            cfg["a1"]
-            if row["team_score"] >= cfg["threshold"]
-            else cfg["a2"]
-        )
-
-    if t == "opp_points_under":
+    if t == "team_points":
 
         return (
             cfg["a1"]
-            if row["opp_score"] < cfg["threshold"]
+            if row[
+                "team_score"
+            ] >= cfg[
+                "threshold"
+            ]
             else cfg["a2"]
         )
 
-    if t == "metric_threshold":
+    if t == "opp_under":
+
+        return (
+            cfg["a1"]
+            if row[
+                "opp_score"
+            ] < cfg[
+                "threshold"
+            ]
+            else cfg["a2"]
+        )
+
+    if t == "metric":
 
         v = row.get(
-            cfg["metric_team"]
+            cfg["metric"]
         )
 
         if (
             v is None
             or pd.isna(v)
         ):
+
             return None
 
         return (
             cfg["a1"]
-            if float(v) >= float(cfg["threshold"])
+            if float(v) >= cfg["threshold"]
             else cfg["a2"]
         )
 
-    if t in (
-        "compare_more",
-        "compare_fewer"
+    a = row.get(
+        cfg["m1"]
+    )
+
+    b = row.get(
+        cfg["m2"]
+    )
+
+    if (
+        a is None
+        or b is None
+        or pd.isna(a)
+        or pd.isna(b)
     ):
 
-        a = row.get(
-            cfg["metric_team"]
-        )
+        return None
 
-        b = row.get(
-            cfg["metric_opp"]
-        )
-
-        if (
-            a is None
-            or b is None
-            or pd.isna(a)
-            or pd.isna(b)
-        ):
-
-            return None
-
-        if t == "compare_more":
-
-            return (
-                cfg["a1"]
-                if float(a) > float(b)
-                else cfg["a2"]
-            )
+    if t == "more":
 
         return (
             cfg["a1"]
-            if float(a) < float(b)
+            if float(a) > float(b)
             else cfg["a2"]
         )
 
-    return None
+    return (
+        cfg["a1"]
+        if float(a) < float(b)
+        else cfg["a2"]
+    )
 
 
-def nba_evidence_text(
+def nba_evidence(
     row,
     cfg
 ):
@@ -1023,28 +1098,42 @@ def nba_evidence_text(
     t = cfg["type"]
 
     if t == "home_away":
-        return row["home_away"]
 
-    if t == "team_points_threshold":
-        return str(row["team_score"])
+        return row[
+            "home_away"
+        ]
 
-    if t == "opp_points_under":
-        return str(row["opp_score"])
+    if t == "team_points":
 
-    if t == "metric_threshold":
+        return str(
+            row[
+                "team_score"
+            ]
+        )
+
+    if t == "opp_under":
+
+        return str(
+            row[
+                "opp_score"
+            ]
+        )
+
+    if t == "metric":
 
         v = row.get(
-            cfg["metric_team"]
+            cfg["metric"]
         )
 
         if (
             v is None
             or pd.isna(v)
         ):
+
             return "Unavailable"
 
         if (
-            cfg["metric_team"]
+            cfg["metric"]
             == "team_fg_pct"
         ):
 
@@ -1052,212 +1141,136 @@ def nba_evidence_text(
                 f"{float(v):.1f}%"
             )
 
-        return f"{float(v):g}"
+        return (
+            f"{float(v):g}"
+        )
 
-    if t in (
-        "compare_more",
-        "compare_fewer"
+    a = row.get(
+        cfg["m1"]
+    )
+
+    b = row.get(
+        cfg["m2"]
+    )
+
+    if (
+        a is None
+        or b is None
+        or pd.isna(a)
+        or pd.isna(b)
     ):
 
-        a = row.get(
-            cfg["metric_team"]
-        )
+        return "Unavailable"
 
-        b = row.get(
-            cfg["metric_opp"]
-        )
-
-        if (
-            a is None
-            or b is None
-            or pd.isna(a)
-            or pd.isna(b)
-        ):
-
-            return "Unavailable"
-
-        if (
-            "halftime"
-            in cfg["metric_team"]
-        ):
-
-            return (
-                f"{float(a):g} – "
-                f"{float(b):g}"
-            )
+    if (
+        "halftime"
+        in cfg["m1"]
+    ):
 
         return (
-            f"{float(a):g} vs. "
+            f"{float(a):g} – "
             f"{float(b):g}"
         )
 
-    return ""
+    return (
+        f"{float(a):g} vs. "
+        f"{float(b):g}"
+    )
 
 
 @st.cache_data(
     ttl=1800,
     show_spinner=False
 )
-def build_nba_dataset(
+def build_nba(
     team_id,
-    season_label,
-    sample_size,
-    variable_name
+    season,
+    sample,
+    variable
 ):
 
-    events = get_nba_schedule(
+    cores = []
+
+    for e in get_nba_schedule(
         team_id,
-        season_label
-    )
+        season
+    ):
 
-    completed = []
-
-    for e in events:
-
-        comps = e.get(
-            "competitions",
-            []
-        )
-
-        if not comps:
-            continue
-
-        status_type = (
-            comps[0]
-            .get(
-                "status",
-                {}
-            )
-            .get(
-                "type",
-                {}
-            )
-        )
-
-        completed_flag = (
-            status_type
-            .get("completed")
-        )
-
-        state = str(
-            status_type.get(
-                "state",
-                ""
-            )
-        ).lower()
-
-        name = str(
-            status_type.get(
-                "name",
-                ""
-            )
-        ).lower()
-
-        short_detail = str(
-            status_type.get(
-                "shortDetail",
-                ""
-            )
-        ).lower()
-
-        core = nba_game_core(
+        core = nba_core(
             e,
             team_id
         )
 
-        is_completed = (
-            completed_flag is True
-            or state == "post"
-            or "final" in name
-            or "final" in short_detail
-            or core is not None
-        )
+        if core:
 
-        if (
-            is_completed
-            and core is not None
-        ):
-
-            completed.append(core)
-
-    def sort_key(g):
-
-        try:
-
-            return pd.to_datetime(
-                g["date"]
+            cores.append(
+                core
             )
 
-        except Exception:
-
-            return pd.Timestamp.max
-
-    completed = sorted(
-        completed,
-        key=sort_key
-    )[:sample_size]
+    cores = sorted(
+        cores,
+        key=lambda g:
+            pd.to_datetime(
+                g["date"]
+            )
+    )[:sample]
 
     cfg = NBA_PRESETS[
-        variable_name
+        variable
     ]
 
     rows = []
 
-    for g in completed:
+    for core in cores:
 
-        row = dict(g)
+        row = dict(
+            core
+        )
 
         if cfg["type"] in (
-            "metric_threshold",
-            "compare_more",
-            "compare_fewer"
+            "metric",
+            "more",
+            "fewer"
         ):
 
             try:
 
-                summary = get_nba_summary(
-                    g["event_id"]
-                )
-
                 row.update(
-                    nba_metric_values(
-                        summary,
+                    nba_metrics(
+                        get_nba_summary(
+                            core[
+                                "event_id"
+                            ]
+                        ),
                         team_id
                     )
                 )
 
-            except Exception:
+            except:
 
-                row.update({
-                    "team_3pm": None,
-                    "opp_3pm": None,
-                    "team_turnovers": None,
-                    "opp_turnovers": None,
-                    "team_rebounds": None,
-                    "opp_rebounds": None,
-                    "team_assists": None,
-                    "team_fg_pct": None,
-                    "halftime_team": None,
-                    "halftime_opp": None,
-                })
+                pass
 
-        row["expected_category"] = (
-            nba_classify(
-                row,
-                cfg
-            )
+        row[
+            "expected_category"
+        ] = nba_classify(
+            row,
+            cfg
         )
 
-        row["evidence"] = (
-            nba_evidence_text(
-                row,
-                cfg
-            )
+        row[
+            "evidence"
+        ] = nba_evidence(
+            row,
+            cfg
         )
 
-        rows.append(row)
+        rows.append(
+            row
+        )
 
-    return pd.DataFrame(rows)
+    return pd.DataFrame(
+        rows
+    )
 
 
 # ============================================================
@@ -1268,36 +1281,39 @@ def build_nba_dataset(
     ttl=3600,
     show_spinner=False
 )
-def get_mlb_teams(season):
+def get_mlb_teams(
+    season
+):
 
     data = safe_get(
-        f"{MLB_API_BASE}/teams",
+        f"{MLB_BASE}/teams",
         params={
-            "sportId": 1,
-            "season": season
+            "sportId":
+                1,
+            "season":
+                season
         }
     )
 
-    teams = []
-
-    for t in data.get(
-        "teams",
-        []
-    ):
-
-        if (
-            t.get("id")
-            and t.get("name")
-        ):
-
-            teams.append({
-                "id": str(t["id"]),
-                "name": t["name"]
-            })
-
     return sorted(
-        teams,
-        key=lambda x: x["name"]
+        [
+            {
+                "id":
+                    str(t["id"]),
+                "name":
+                    t["name"]
+            }
+            for t in data.get(
+                "teams",
+                []
+            )
+            if (
+                t.get("id")
+                and t.get("name")
+            )
+        ],
+        key=lambda x:
+            x["name"]
     )
 
 
@@ -1311,49 +1327,53 @@ def get_mlb_schedule(
 ):
 
     data = safe_get(
-        f"{MLB_API_BASE}/schedule",
+        f"{MLB_BASE}/schedule",
         params={
-            "sportId": 1,
-            "teamId": team_id,
-            "season": season,
-            "gameType": "R"
+            "sportId":
+                1,
+            "teamId":
+                team_id,
+            "season":
+                season,
+            "gameType":
+                "R"
         }
     )
 
-    games = []
-
-    for date_block in data.get(
-        "dates",
-        []
-    ):
-
-        games.extend(
-            date_block.get(
-                "games",
-                []
-            )
+    return [
+        g
+        for d
+        in data.get(
+            "dates",
+            []
         )
-
-    return games
+        for g
+        in d.get(
+            "games",
+            []
+        )
+    ]
 
 
 @st.cache_data(
     ttl=86400,
     show_spinner=False
 )
-def get_mlb_game_feed(game_pk):
+def get_mlb_feed(
+    game_pk
+):
 
     return safe_get(
-        f"{MLB_API_BASE}.1/game/{game_pk}/feed/live"
+        f"{MLB_BASE}.1/game/{game_pk}/feed/live"
     )
 
 
-def mlb_game_core(
-    game,
+def mlb_core(
+    g,
     team_id
 ):
 
-    teams = game.get(
+    teams = g.get(
         "teams",
         {}
     )
@@ -1368,7 +1388,7 @@ def mlb_game_core(
         {}
     )
 
-    home_id = str(
+    hid = str(
         home.get(
             "team",
             {}
@@ -1378,7 +1398,7 @@ def mlb_game_core(
         )
     )
 
-    away_id = str(
+    aid = str(
         away.get(
             "team",
             {}
@@ -1388,25 +1408,21 @@ def mlb_game_core(
         )
     )
 
-    if str(team_id) == home_id:
+    if str(team_id) == hid:
 
-        team_side = "home"
+        team = home
+        opp = away
+        side = "home"
         opp_side = "away"
+        ha = "Home"
 
-        team_obj = home
-        opp_obj = away
+    elif str(team_id) == aid:
 
-        home_away = "Home"
-
-    elif str(team_id) == away_id:
-
-        team_side = "away"
+        team = away
+        opp = home
+        side = "away"
         opp_side = "home"
-
-        team_obj = away
-        opp_obj = home
-
-        home_away = "Away"
+        ha = "Away"
 
     else:
 
@@ -1414,29 +1430,27 @@ def mlb_game_core(
 
     try:
 
-        team_score = int(
-            team_obj.get("score")
+        ts = int(
+            team.get(
+                "score"
+            )
         )
 
-        opp_score = int(
-            opp_obj.get("score")
+        os = int(
+            opp.get(
+                "score"
+            )
         )
 
-    except Exception:
+    except:
 
         return None
 
-    result = (
-        "Win"
-        if team_score > opp_score
-        else "Did Not Win"
-    )
-
     try:
 
-        date_display = (
+        date = (
             pd.to_datetime(
-                game.get(
+                g.get(
                     "gameDate",
                     ""
                 )
@@ -1446,40 +1460,57 @@ def mlb_game_core(
             )
         )
 
-    except Exception:
+    except:
 
-        date_display = str(
-            game.get(
+        date = str(
+            g.get(
                 "officialDate",
                 ""
             )
         )
 
     return {
-        "game_pk": str(
-            game.get(
-                "gamePk",
-                ""
-            )
-        ),
-        "date": date_display,
-        "opponent": (
-            opp_obj
-            .get(
+        "game_pk":
+            str(
+                g.get(
+                    "gamePk",
+                    ""
+                )
+            ),
+
+        "date":
+            date,
+
+        "opponent":
+            opp.get(
                 "team",
                 {}
-            )
-            .get(
+            ).get(
                 "name",
                 "Opponent"
+            ),
+
+        "home_away":
+            ha,
+
+        "team_side":
+            side,
+
+        "opp_side":
+            opp_side,
+
+        "team_score":
+            ts,
+
+        "opp_score":
+            os,
+
+        "result":
+            (
+                "Win"
+                if ts > os
+                else "Did Not Win"
             )
-        ),
-        "home_away": home_away,
-        "team_side": team_side,
-        "opp_side": opp_side,
-        "team_score": team_score,
-        "opp_score": opp_score,
-        "result": result,
     }
 
 
@@ -1513,69 +1544,12 @@ def mlb_team_stats(
     )
 
 
-def mlb_batting_stat(
-    feed,
-    side,
-    key
-):
-
-    return (
-        mlb_team_stats(
-            feed,
-            side
-        )
-        .get(
-            "batting",
-            {}
-        )
-        .get(key)
-    )
-
-
-def mlb_pitching_stat(
-    feed,
-    side,
-    key
-):
-
-    return (
-        mlb_team_stats(
-            feed,
-            side
-        )
-        .get(
-            "pitching",
-            {}
-        )
-        .get(key)
-    )
-
-
-def mlb_fielding_stat(
-    feed,
-    side,
-    key
-):
-
-    return (
-        mlb_team_stats(
-            feed,
-            side
-        )
-        .get(
-            "fielding",
-            {}
-        )
-        .get(key)
-    )
-
-
 def mlb_scored_first(
     feed,
-    team_side
+    side
 ):
 
-    plays = (
+    for p in (
         feed
         .get(
             "liveData",
@@ -1585,14 +1559,11 @@ def mlb_scored_first(
             "plays",
             {}
         )
-    )
-
-    all_plays = plays.get(
-        "allPlays",
-        []
-    )
-
-    for p in all_plays:
+        .get(
+            "allPlays",
+            []
+        )
+    ):
 
         if (
             p.get(
@@ -1603,25 +1574,24 @@ def mlb_scored_first(
             ) is True
         ):
 
-            half = str(
-                p.get(
-                    "about",
-                    {}
-                ).get(
-                    "halfInning",
-                    ""
-                )
-            ).lower()
-
             scoring_side = (
                 "away"
-                if half == "top"
+                if str(
+                    p.get(
+                        "about",
+                        {}
+                    ).get(
+                        "halfInning",
+                        ""
+                    )
+                ).lower()
+                == "top"
                 else "home"
             )
 
             return (
                 scoring_side
-                == team_side
+                == side
             )
 
     return False
@@ -1629,10 +1599,10 @@ def mlb_scored_first(
 
 def mlb_quality_start(
     feed,
-    team_side
+    side
 ):
 
-    side_box = (
+    box = (
         feed
         .get(
             "liveData",
@@ -1647,32 +1617,30 @@ def mlb_quality_start(
             {}
         )
         .get(
-            team_side,
+            side,
             {}
         )
     )
 
-    players = side_box.get(
-        "players",
-        {}
-    )
-
-    pitcher_ids = side_box.get(
+    ids = box.get(
         "pitchers",
         []
     )
 
-    if not pitcher_ids:
+    if not ids:
 
         return None, None, None
 
-    starter = players.get(
-        f"ID{pitcher_ids[0]}",
-        {}
-    )
-
-    pitching = (
-        starter
+    p = (
+        box
+        .get(
+            "players",
+            {}
+        )
+        .get(
+            f"ID{ids[0]}",
+            {}
+        )
         .get(
             "stats",
             {}
@@ -1684,13 +1652,13 @@ def mlb_quality_start(
     )
 
     ip = as_number(
-        pitching.get(
+        p.get(
             "inningsPitched"
         )
     )
 
     er = as_number(
-        pitching.get(
+        p.get(
             "earnedRuns"
         )
     )
@@ -1700,45 +1668,152 @@ def mlb_quality_start(
         or er is None
     ):
 
-        return None, ip, er
+        return (
+            None,
+            ip,
+            er
+        )
 
     return (
-        (
-            ip >= 6
-            and er <= 3
-        ),
+        ip >= 6
+        and er <= 3,
         ip,
         er
     )
 
 
+def mlb_metrics(
+    feed,
+    core
+):
+
+    stats = mlb_team_stats(
+        feed,
+        core[
+            "team_side"
+        ]
+    )
+
+    bat = stats.get(
+        "batting",
+        {}
+    )
+
+    fld = stats.get(
+        "fielding",
+        {}
+    )
+
+    pit = stats.get(
+        "pitching",
+        {}
+    )
+
+    qs, ip, er = (
+        mlb_quality_start(
+            feed,
+            core[
+                "team_side"
+            ]
+        )
+    )
+
+    return {
+        "home_runs":
+            as_number(
+                bat.get(
+                    "homeRuns"
+                )
+            ),
+
+        "hits":
+            as_number(
+                bat.get(
+                    "hits"
+                )
+            ),
+
+        "walks":
+            as_number(
+                bat.get(
+                    "baseOnBalls"
+                )
+            ),
+
+        "errors":
+            as_number(
+                fld.get(
+                    "errors"
+                )
+            ),
+
+        "pitching_strikeouts":
+            as_number(
+                pit.get(
+                    "strikeOuts"
+                )
+            ),
+
+        "scored_first":
+            mlb_scored_first(
+                feed,
+                core[
+                    "team_side"
+                ]
+            ),
+
+        "quality_start":
+            qs,
+
+        "starter_ip":
+            ip,
+
+        "starter_er":
+            er
+    }
+
+
 MLB_PRESETS = {
 
     "Home vs. Away": {
-        "type": "home_away",
-        "a1": "Home",
-        "a2": "Away",
-        "evidence_label": "Location",
+        "type":
+            "home_away",
+        "a1":
+            "Home",
+        "a2":
+            "Away",
+        "evidence_label":
+            "Location",
         "question":
             "Does playing at home appear associated with whether the team wins?"
     },
 
     "Hit at least 1 home run": {
-        "type": "metric_threshold",
-        "metric": "home_runs",
-        "threshold": 1,
-        "a1": "Hit 1 Plus HR",
-        "a2": "Hit 0 HR",
-        "evidence_label": "Team HR",
+        "type":
+            "metric",
+        "metric":
+            "home_runs",
+        "threshold":
+            1,
+        "a1":
+            "Hit 1 Plus HR",
+        "a2":
+            "Hit 0 HR",
+        "evidence_label":
+            "Team HR",
         "question":
             "Is hitting at least one home run associated with whether the team wins?"
     },
 
     "Scored first": {
-        "type": "boolean",
-        "metric": "scored_first",
-        "a1": "Scored First",
-        "a2": "Did Not Score First",
+        "type":
+            "boolean",
+        "metric":
+            "scored_first",
+        "a1":
+            "Scored First",
+        "a2":
+            "Did Not Score First",
         "evidence_label":
             "First scoring team",
         "question":
@@ -1746,11 +1821,16 @@ MLB_PRESETS = {
     },
 
     "Committed at least 1 error": {
-        "type": "metric_threshold",
-        "metric": "errors",
-        "threshold": 1,
-        "a1": "Committed 1 Plus Error",
-        "a2": "Committed 0 Errors",
+        "type":
+            "metric",
+        "metric":
+            "errors",
+        "threshold":
+            1,
+        "a1":
+            "Committed 1 Plus Error",
+        "a2":
+            "Committed 0 Errors",
         "evidence_label":
             "Team errors",
         "question":
@@ -1758,10 +1838,14 @@ MLB_PRESETS = {
     },
 
     "Scored at least 5 runs": {
-        "type": "team_score_threshold",
-        "threshold": 5,
-        "a1": "5 Plus Runs",
-        "a2": "Under 5 Runs",
+        "type":
+            "team_score",
+        "threshold":
+            5,
+        "a1":
+            "5 Plus Runs",
+        "a2":
+            "Under 5 Runs",
         "evidence_label":
             "Team runs",
         "question":
@@ -1769,11 +1853,16 @@ MLB_PRESETS = {
     },
 
     "At least 10 hits": {
-        "type": "metric_threshold",
-        "metric": "hits",
-        "threshold": 10,
-        "a1": "10 Plus Hits",
-        "a2": "Under 10 Hits",
+        "type":
+            "metric",
+        "metric":
+            "hits",
+        "threshold":
+            10,
+        "a1":
+            "10 Plus Hits",
+        "a2":
+            "Under 10 Hits",
         "evidence_label":
             "Team hits",
         "question":
@@ -1781,10 +1870,14 @@ MLB_PRESETS = {
     },
 
     "Quality start": {
-        "type": "boolean",
-        "metric": "quality_start",
-        "a1": "Quality Start",
-        "a2": "No Quality Start",
+        "type":
+            "boolean",
+        "metric":
+            "quality_start",
+        "a1":
+            "Quality Start",
+        "a2":
+            "No Quality Start",
         "evidence_label":
             "Starter IP / ER",
         "question":
@@ -1792,11 +1885,16 @@ MLB_PRESETS = {
     },
 
     "At least 2 home runs": {
-        "type": "metric_threshold",
-        "metric": "home_runs",
-        "threshold": 2,
-        "a1": "2 Plus HR",
-        "a2": "Fewer Than 2 HR",
+        "type":
+            "metric",
+        "metric":
+            "home_runs",
+        "threshold":
+            2,
+        "a1":
+            "2 Plus HR",
+        "a2":
+            "Fewer Than 2 HR",
         "evidence_label":
             "Team HR",
         "question":
@@ -1804,11 +1902,16 @@ MLB_PRESETS = {
     },
 
     "At least 4 walks": {
-        "type": "metric_threshold",
-        "metric": "walks",
-        "threshold": 4,
-        "a1": "4 Plus Walks",
-        "a2": "Fewer Than 4 Walks",
+        "type":
+            "metric",
+        "metric":
+            "walks",
+        "threshold":
+            4,
+        "a1":
+            "4 Plus Walks",
+        "a2":
+            "Fewer Than 4 Walks",
         "evidence_label":
             "Team walks",
         "question":
@@ -1816,9 +1919,12 @@ MLB_PRESETS = {
     },
 
     "At least 10 pitching strikeouts": {
-        "type": "metric_threshold",
-        "metric": "pitching_strikeouts",
-        "threshold": 10,
+        "type":
+            "metric",
+        "metric":
+            "pitching_strikeouts",
+        "threshold":
+            10,
         "a1":
             "10 Plus Pitching Strikeouts",
         "a2":
@@ -1827,70 +1933,8 @@ MLB_PRESETS = {
             "Pitching strikeouts",
         "question":
             "Are 10 or more team strikeouts by the team's pitchers associated with whether the team wins?"
-    },
-}
-
-
-def mlb_metric_values(
-    feed,
-    core
-):
-
-    team_side = core[
-        "team_side"
-    ]
-
-    quality_start, starter_ip, starter_er = (
-        mlb_quality_start(
-            feed,
-            team_side
-        )
-    )
-
-    return {
-        "home_runs": as_number(
-            mlb_batting_stat(
-                feed,
-                team_side,
-                "homeRuns"
-            )
-        ),
-        "hits": as_number(
-            mlb_batting_stat(
-                feed,
-                team_side,
-                "hits"
-            )
-        ),
-        "walks": as_number(
-            mlb_batting_stat(
-                feed,
-                team_side,
-                "baseOnBalls"
-            )
-        ),
-        "errors": as_number(
-            mlb_fielding_stat(
-                feed,
-                team_side,
-                "errors"
-            )
-        ),
-        "pitching_strikeouts": as_number(
-            mlb_pitching_stat(
-                feed,
-                team_side,
-                "strikeOuts"
-            )
-        ),
-        "scored_first": mlb_scored_first(
-            feed,
-            team_side
-        ),
-        "quality_start": quality_start,
-        "starter_ip": starter_ip,
-        "starter_er": starter_er,
     }
+}
 
 
 def mlb_classify(
@@ -1898,35 +1942,947 @@ def mlb_classify(
     cfg
 ):
 
-    t = cfg["type"]
+    if cfg["type"] == "home_away":
 
-    if t == "home_away":
-        return row["home_away"]
+        return row[
+            "home_away"
+        ]
 
-    if t == "team_score_threshold":
+    if cfg["type"] == "team_score":
 
         return (
             cfg["a1"]
-            if row["team_score"] >= cfg["threshold"]
+            if row[
+                "team_score"
+            ] >= cfg[
+                "threshold"
+            ]
             else cfg["a2"]
         )
 
-    if t == "metric_threshold":
+    v = row.get(
+        cfg["metric"]
+    )
 
-        v = row.get(
-            cfg["metric"]
-        )
+    if (
+        v is None
+        or pd.isna(v)
+    ):
 
-        if (
-            v is None
-            or pd.isna(v)
-        ):
+        return None
 
-            return None
+    if cfg["type"] == "boolean":
 
         return (
             cfg["a1"]
-            if float(v) >= float(cfg["threshold"])
+            if bool(v)
+            else cfg["a2"]
+        )
+
+    return (
+        cfg["a1"]
+        if float(v)
+        >= cfg["threshold"]
+        else cfg["a2"]
+    )
+
+
+def mlb_evidence(
+    row,
+    cfg
+):
+
+    if cfg["type"] == "home_away":
+
+        return row[
+            "home_away"
+        ]
+
+    if cfg["type"] == "team_score":
+
+        return str(
+            row[
+                "team_score"
+            ]
+        )
+
+    v = row.get(
+        cfg["metric"]
+    )
+
+    if (
+        v is None
+        or pd.isna(v)
+    ):
+
+        return "Unavailable"
+
+    if (
+        cfg["metric"]
+        == "scored_first"
+    ):
+
+        return (
+            "Team scored first"
+            if v
+            else "Opponent scored first"
+        )
+
+    if (
+        cfg["metric"]
+        == "quality_start"
+    ):
+
+        return (
+            f"{row.get('starter_ip'):g} IP / "
+            f"{row.get('starter_er'):g} ER"
+        )
+
+    return (
+        f"{float(v):g}"
+    )
+
+
+@st.cache_data(
+    ttl=1800,
+    show_spinner=False
+)
+def build_mlb(
+    team_id,
+    season,
+    sample,
+    variable
+):
+
+    cores = []
+
+    for g in get_mlb_schedule(
+        team_id,
+        int(season)
+    ):
+
+        state = str(
+            g.get(
+                "status",
+                {}
+            ).get(
+                "abstractGameState",
+                ""
+            )
+        ).lower()
+
+        if state != "final":
+
+            continue
+
+        core = mlb_core(
+            g,
+            team_id
+        )
+
+        if core:
+
+            cores.append(
+                core
+            )
+
+    cores = sorted(
+        cores,
+        key=lambda g:
+            pd.to_datetime(
+                g["date"]
+            )
+    )[:sample]
+
+    cfg = MLB_PRESETS[
+        variable
+    ]
+
+    rows = []
+
+    for core in cores:
+
+        row = dict(
+            core
+        )
+
+        if cfg["type"] not in (
+            "home_away",
+            "team_score"
+        ):
+
+            try:
+
+                row.update(
+                    mlb_metrics(
+                        get_mlb_feed(
+                            core[
+                                "game_pk"
+                            ]
+                        ),
+                        core
+                    )
+                )
+
+            except:
+
+                pass
+
+        row[
+            "expected_category"
+        ] = mlb_classify(
+            row,
+            cfg
+        )
+
+        row[
+            "evidence"
+        ] = mlb_evidence(
+            row,
+            cfg
+        )
+
+        rows.append(
+            row
+        )
+
+    return pd.DataFrame(
+        rows
+    )
+
+
+# ============================================================
+# NHL
+# ============================================================
+
+NHL_TEAMS = [
+
+    ("Anaheim Ducks", "ANA"),
+    ("Boston Bruins", "BOS"),
+    ("Buffalo Sabres", "BUF"),
+    ("Calgary Flames", "CGY"),
+    ("Carolina Hurricanes", "CAR"),
+    ("Chicago Blackhawks", "CHI"),
+    ("Colorado Avalanche", "COL"),
+    ("Columbus Blue Jackets", "CBJ"),
+    ("Dallas Stars", "DAL"),
+    ("Detroit Red Wings", "DET"),
+    ("Edmonton Oilers", "EDM"),
+    ("Florida Panthers", "FLA"),
+    ("Los Angeles Kings", "LAK"),
+    ("Minnesota Wild", "MIN"),
+    ("Montreal Canadiens", "MTL"),
+    ("Nashville Predators", "NSH"),
+    ("New Jersey Devils", "NJD"),
+    ("New York Islanders", "NYI"),
+    ("New York Rangers", "NYR"),
+    ("Ottawa Senators", "OTT"),
+    ("Philadelphia Flyers", "PHI"),
+    ("Pittsburgh Penguins", "PIT"),
+    ("San Jose Sharks", "SJS"),
+    ("Seattle Kraken", "SEA"),
+    ("St. Louis Blues", "STL"),
+    ("Tampa Bay Lightning", "TBL"),
+    ("Toronto Maple Leafs", "TOR"),
+    ("Utah Mammoth", "UTA"),
+    ("Vancouver Canucks", "VAN"),
+    ("Vegas Golden Knights", "VGK"),
+    ("Washington Capitals", "WSH"),
+    ("Winnipeg Jets", "WPG")
+]
+
+
+def get_nhl_teams():
+
+    return [
+        {
+            "id":
+                abbr,
+            "name":
+                name
+        }
+        for name, abbr
+        in NHL_TEAMS
+    ]
+
+
+def nhl_season_id(
+    label
+):
+
+    m = re.match(
+        r"(\d{4})-(\d{2})",
+        label
+    )
+
+    if not m:
+
+        return str(
+            label
+        )
+
+    start = int(
+        m.group(1)
+    )
+
+    return (
+        f"{start}"
+        f"{start + 1}"
+    )
+
+
+@st.cache_data(
+    ttl=1800,
+    show_spinner=False
+)
+def get_nhl_schedule(
+    abbr,
+    season
+):
+
+    return safe_get(
+        f"{NHL_BASE}/club-schedule-season/{abbr}/{nhl_season_id(season)}"
+    ).get(
+        "games",
+        []
+    )
+
+
+@st.cache_data(
+    ttl=86400,
+    show_spinner=False
+)
+def get_nhl_boxscore(
+    game_id
+):
+
+    return safe_get(
+        f"{NHL_BASE}/gamecenter/{game_id}/boxscore"
+    )
+
+
+@st.cache_data(
+    ttl=86400,
+    show_spinner=False
+)
+def get_nhl_landing(
+    game_id
+):
+
+    return safe_get(
+        f"{NHL_BASE}/gamecenter/{game_id}/landing"
+    )
+
+
+def nhl_core(
+    g,
+    abbr
+):
+
+    if g.get(
+        "gameType"
+    ) != 2:
+
+        return None
+
+    away = g.get(
+        "awayTeam",
+        {}
+    )
+
+    home = g.get(
+        "homeTeam",
+        {}
+    )
+
+    aa = away.get(
+        "abbrev"
+    )
+
+    ha = home.get(
+        "abbrev"
+    )
+
+    if abbr == ha:
+
+        team = home
+        opp = away
+        side = "homeTeam"
+        home_away = "Home"
+
+    elif abbr == aa:
+
+        team = away
+        opp = home
+        side = "awayTeam"
+        home_away = "Away"
+
+    else:
+
+        return None
+
+    ts = as_number(
+        team.get(
+            "score"
+        )
+    )
+
+    os = as_number(
+        opp.get(
+            "score"
+        )
+    )
+
+    state = str(
+        g.get(
+            "gameState",
+            ""
+        )
+    ).upper()
+
+    if (
+        ts is None
+        or os is None
+        or state not in (
+            "FINAL",
+            "OFF"
+        )
+    ):
+
+        return None
+
+    try:
+
+        date = (
+            pd.to_datetime(
+                g.get(
+                    "gameDate",
+                    ""
+                )
+            )
+            .strftime(
+                "%b %d, %Y"
+            )
+        )
+
+    except:
+
+        date = str(
+            g.get(
+                "gameDate",
+                ""
+            )
+        )
+
+    opp_name = (
+        opp.get(
+            "placeName",
+            {}
+        ).get(
+            "default",
+            opp.get(
+                "abbrev",
+                "Opponent"
+            )
+        )
+        + " "
+        + opp.get(
+            "commonName",
+            {}
+        ).get(
+            "default",
+            ""
+        )
+    ).strip()
+
+    return {
+        "game_id":
+            str(
+                g.get(
+                    "id",
+                    ""
+                )
+            ),
+
+        "date":
+            date,
+
+        "opponent":
+            opp_name,
+
+        "home_away":
+            home_away,
+
+        "team_side":
+            side,
+
+        "team_score":
+            int(ts),
+
+        "opp_score":
+            int(os),
+
+        "result":
+            (
+                "Win"
+                if ts > os
+                else "Did Not Win"
+            )
+    }
+
+
+def goal_team_abbr(
+    goal
+):
+
+    v = goal.get(
+        "teamAbbrev"
+    )
+
+    if isinstance(
+        v,
+        dict
+    ):
+
+        return v.get(
+            "default"
+        )
+
+    if isinstance(
+        v,
+        str
+    ):
+
+        return v
+
+    return goal.get(
+        "eventOwnerTeamAbbrev"
+    )
+
+
+def nhl_scoring_metrics(
+    landing,
+    abbr
+):
+
+    first_goal = None
+
+    first_period_team = 0
+    first_period_opp = 0
+
+    ppg = 0
+
+    for block in landing.get(
+        "scoring",
+        []
+    ):
+
+        period = (
+            block
+            .get(
+                "periodDescriptor",
+                {}
+            )
+            .get(
+                "number"
+            )
+        )
+
+        for goal in block.get(
+            "goals",
+            []
+        ):
+
+            ga = goal_team_abbr(
+                goal
+            )
+
+            if first_goal is None:
+
+                first_goal = ga
+
+            if period == 1:
+
+                if ga == abbr:
+
+                    first_period_team += 1
+
+                else:
+
+                    first_period_opp += 1
+
+            strength = str(
+                goal.get(
+                    "strength",
+                    ""
+                )
+            ).upper()
+
+            if (
+                ga == abbr
+                and (
+                    "PP"
+                    in strength
+                    or strength
+                    == "POWER PLAY"
+                )
+            ):
+
+                ppg += 1
+
+    return {
+        "scored_first":
+            (
+                first_goal == abbr
+                if first_goal
+                else None
+            ),
+
+        "first_period_team":
+            first_period_team,
+
+        "first_period_opp":
+            first_period_opp,
+
+        "power_play_goals":
+            ppg
+    }
+
+
+def nhl_goalie_save_pct(
+    box,
+    side
+):
+
+    goalies = (
+        box
+        .get(
+            "playerByGameStats",
+            {}
+        )
+        .get(
+            side,
+            {}
+        )
+        .get(
+            "goalies",
+            []
+        )
+    )
+
+    total_saves = 0
+    total_shots = 0
+
+    for g in goalies:
+
+        sv = as_number(
+            g.get(
+                "saves"
+            )
+        )
+
+        sa = as_number(
+            g.get(
+                "shotsAgainst"
+            )
+        )
+
+        if (
+            sv is not None
+            and sa is not None
+        ):
+
+            total_saves += sv
+            total_shots += sa
+
+        else:
+
+            ssa = str(
+                g.get(
+                    "saveShotsAgainst",
+                    ""
+                )
+            )
+
+            m = re.match(
+                r"(\d+)\s*/\s*(\d+)",
+                ssa
+            )
+
+            if m:
+
+                total_saves += float(
+                    m.group(1)
+                )
+
+                total_shots += float(
+                    m.group(2)
+                )
+
+    return (
+        None
+        if total_shots == 0
+        else total_saves
+        / total_shots
+    )
+
+
+def nhl_metrics(
+    box,
+    landing,
+    core,
+    abbr
+):
+
+    team = box.get(
+        core[
+            "team_side"
+        ],
+        {}
+    )
+
+    opp_side = (
+        "awayTeam"
+        if core[
+            "team_side"
+        ] == "homeTeam"
+        else "homeTeam"
+    )
+
+    opp = box.get(
+        opp_side,
+        {}
+    )
+
+    m = nhl_scoring_metrics(
+        landing,
+        abbr
+    )
+
+    m.update({
+
+        "team_sog":
+            as_number(
+                team.get(
+                    "sog"
+                )
+            ),
+
+        "opp_sog":
+            as_number(
+                opp.get(
+                    "sog"
+                )
+            ),
+
+        "save_pct":
+            nhl_goalie_save_pct(
+                box,
+                core[
+                    "team_side"
+                ]
+            )
+    })
+
+    return m
+
+
+NHL_PRESETS = {
+
+    "Home vs. Away": {
+        "type":
+            "home_away",
+        "a1":
+            "Home",
+        "a2":
+            "Away",
+        "evidence_label":
+            "Location",
+        "question":
+            "Does playing at home appear associated with whether the team wins?"
+    },
+
+    "Scored first": {
+        "type":
+            "boolean",
+        "metric":
+            "scored_first",
+        "a1":
+            "Scored First",
+        "a2":
+            "Did Not Score First",
+        "evidence_label":
+            "First goal",
+        "question":
+            "Does scoring the first goal appear associated with whether the team wins?"
+    },
+
+    "Scored at least 4 goals": {
+        "type":
+            "team_score",
+        "threshold":
+            4,
+        "a1":
+            "4 Plus Goals",
+        "a2":
+            "Under 4 Goals",
+        "evidence_label":
+            "Team goals",
+        "question":
+            "Is scoring four or more goals associated with whether the team wins?"
+    },
+
+    "More shots than opponent": {
+        "type":
+            "more",
+        "m1":
+            "team_sog",
+        "m2":
+            "opp_sog",
+        "a1":
+            "More Shots",
+        "a2":
+            "Not More Shots",
+        "evidence_label":
+            "Team SOG vs. opponent SOG",
+        "question":
+            "Is outshooting the opponent associated with whether the team wins?"
+    },
+
+    "Scored a power-play goal": {
+        "type":
+            "metric",
+        "metric":
+            "power_play_goals",
+        "threshold":
+            1,
+        "a1":
+            "Scored 1 Plus Power-Play Goal",
+        "a2":
+            "Scored 0",
+        "evidence_label":
+            "Power-play goals",
+        "question":
+            "Is scoring a power-play goal associated with whether the team wins?"
+    },
+
+    "Team save percentage .900 or higher": {
+        "type":
+            "metric",
+        "metric":
+            "save_pct",
+        "threshold":
+            0.900,
+        "a1":
+            ".900 Plus Save Percentage",
+        "a2":
+            "Below .900",
+        "evidence_label":
+            "Team save percentage",
+        "question":
+            "Is a team save percentage of .900 or higher associated with whether the team wins?"
+    },
+
+    "Led after the 1st period": {
+        "type":
+            "more",
+        "m1":
+            "first_period_team",
+        "m2":
+            "first_period_opp",
+        "a1":
+            "Led After 1st Period",
+        "a2":
+            "Did Not Lead",
+        "evidence_label":
+            "1st-period score",
+        "question":
+            "Does leading after the first period appear associated with whether the team wins?"
+    },
+
+    "Held opponent to 2 or fewer goals": {
+        "type":
+            "opp_at_most",
+        "threshold":
+            2,
+        "a1":
+            "Opponent 2 or Fewer Goals",
+        "a2":
+            "Opponent 3 Plus",
+        "evidence_label":
+            "Opponent goals",
+        "question":
+            "Is holding the opponent to two or fewer goals associated with whether the team wins?"
+    },
+
+    "Scored at least 3 goals": {
+        "type":
+            "team_score",
+        "threshold":
+            3,
+        "a1":
+            "3 Plus Goals",
+        "a2":
+            "Under 3 Goals",
+        "evidence_label":
+            "Team goals",
+        "question":
+            "Is scoring at least three goals associated with whether the team wins?"
+    },
+
+    "Allowed 30 or fewer shots": {
+        "type":
+            "opp_metric_at_most",
+        "metric":
+            "opp_sog",
+        "threshold":
+            30,
+        "a1":
+            "Allowed 30 or Fewer Shots",
+        "a2":
+            "Allowed 31 Plus",
+        "evidence_label":
+            "Opponent SOG",
+        "question":
+            "Is allowing 30 or fewer shots on goal associated with whether the team wins?"
+    }
+}
+
+
+def nhl_classify(
+    row,
+    cfg
+):
+
+    t = cfg["type"]
+
+    if t == "home_away":
+
+        return row[
+            "home_away"
+        ]
+
+    if t == "team_score":
+
+        return (
+            cfg["a1"]
+            if row[
+                "team_score"
+            ] >= cfg[
+                "threshold"
+            ]
+            else cfg["a2"]
+        )
+
+    if t == "opp_at_most":
+
+        return (
+            cfg["a1"]
+            if row[
+                "opp_score"
+            ] <= cfg[
+                "threshold"
+            ]
             else cfg["a2"]
         )
 
@@ -1937,6 +2893,7 @@ def mlb_classify(
         )
 
         if v is None:
+
             return None
 
         return (
@@ -1945,25 +2902,7 @@ def mlb_classify(
             else cfg["a2"]
         )
 
-    return None
-
-
-def mlb_evidence_text(
-    row,
-    cfg
-):
-
-    t = cfg["type"]
-
-    if t == "home_away":
-        return row["home_away"]
-
-    if t == "team_score_threshold":
-        return str(
-            row["team_score"]
-        )
-
-    if t == "metric_threshold":
+    if t == "metric":
 
         v = row.get(
             cfg["metric"]
@@ -1973,207 +2912,278 @@ def mlb_evidence_text(
             v is None
             or pd.isna(v)
         ):
-            return "Unavailable"
 
-        return f"{float(v):g}"
+            return None
+
+        return (
+            cfg["a1"]
+            if float(v)
+            >= cfg[
+                "threshold"
+            ]
+            else cfg["a2"]
+        )
+
+    if t == "opp_metric_at_most":
+
+        v = row.get(
+            cfg["metric"]
+        )
+
+        if (
+            v is None
+            or pd.isna(v)
+        ):
+
+            return None
+
+        return (
+            cfg["a1"]
+            if float(v)
+            <= cfg[
+                "threshold"
+            ]
+            else cfg["a2"]
+        )
+
+    a = row.get(
+        cfg["m1"]
+    )
+
+    b = row.get(
+        cfg["m2"]
+    )
+
+    if (
+        a is None
+        or b is None
+        or pd.isna(a)
+        or pd.isna(b)
+    ):
+
+        return None
+
+    return (
+        cfg["a1"]
+        if float(a) > float(b)
+        else cfg["a2"]
+    )
+
+
+def nhl_evidence(
+    row,
+    cfg
+):
+
+    t = cfg["type"]
+
+    if t == "home_away":
+
+        return row[
+            "home_away"
+        ]
+
+    if t == "team_score":
+
+        return str(
+            row[
+                "team_score"
+            ]
+        )
+
+    if t == "opp_at_most":
+
+        return str(
+            row[
+                "opp_score"
+            ]
+        )
 
     if t == "boolean":
 
+        return (
+            "Team scored first"
+            if row.get(
+                cfg["metric"]
+            )
+            else "Opponent scored first"
+        )
+
+    if t in (
+        "metric",
+        "opp_metric_at_most"
+    ):
+
+        v = row.get(
+            cfg["metric"]
+        )
+
+        if (
+            v is None
+            or pd.isna(v)
+        ):
+
+            return "Unavailable"
+
         if (
             cfg["metric"]
-            == "scored_first"
+            == "save_pct"
         ):
 
             return (
-                "Team scored first"
-                if row.get(
-                    "scored_first"
-                )
-                else "Opponent scored first"
+                f"{float(v):.3f}"
             )
 
-        if (
-            cfg["metric"]
-            == "quality_start"
-        ):
+        return (
+            f"{float(v):g}"
+        )
 
-            ip = row.get(
-                "starter_ip"
-            )
+    a = row.get(
+        cfg["m1"]
+    )
 
-            er = row.get(
-                "starter_er"
-            )
+    b = row.get(
+        cfg["m2"]
+    )
 
-            if (
-                ip is None
-                or er is None
-            ):
+    if (
+        a is None
+        or b is None
+        or pd.isna(a)
+        or pd.isna(b)
+    ):
 
-                return "Unavailable"
+        return "Unavailable"
 
-            return (
-                f"{float(ip):g} IP / "
-                f"{float(er):g} ER"
-            )
+    if (
+        "period"
+        in cfg["m1"]
+    ):
 
-    return ""
+        return (
+            f"{float(a):g} – "
+            f"{float(b):g}"
+        )
+
+    return (
+        f"{float(a):g} vs. "
+        f"{float(b):g}"
+    )
 
 
 @st.cache_data(
     ttl=1800,
     show_spinner=False
 )
-def build_mlb_dataset(
-    team_id,
+def build_nhl(
+    abbr,
     season,
-    sample_size,
-    variable_name
+    sample,
+    variable
 ):
 
-    games = get_mlb_schedule(
-        team_id,
+    cores = []
+
+    for g in get_nhl_schedule(
+        abbr,
         season
-    )
+    ):
 
-    completed = []
-
-    for g in games:
-
-        status = g.get(
-            "status",
-            {}
-        )
-
-        abstract = str(
-            status.get(
-                "abstractGameState",
-                ""
-            )
-        ).lower()
-
-        coded = str(
-            status.get(
-                "codedGameState",
-                ""
-            )
-        ).upper()
-
-        detailed = str(
-            status.get(
-                "detailedState",
-                ""
-            )
-        ).lower()
-
-        is_completed = (
-            abstract == "final"
-            or coded == "F"
-            or "final" in detailed
-            or "game over" in detailed
-        )
-
-        if not is_completed:
-            continue
-
-        core = mlb_game_core(
+        core = nhl_core(
             g,
-            team_id
+            abbr
         )
 
         if core:
-            completed.append(
+
+            cores.append(
                 core
             )
 
-    def sort_key(g):
-
-        try:
-
-            return pd.to_datetime(
+    cores = sorted(
+        cores,
+        key=lambda g:
+            pd.to_datetime(
                 g["date"]
             )
+    )[:sample]
 
-        except Exception:
-
-            return pd.Timestamp.max
-
-    completed = sorted(
-        completed,
-        key=sort_key
-    )[:sample_size]
-
-    cfg = MLB_PRESETS[
-        variable_name
+    cfg = NHL_PRESETS[
+        variable
     ]
 
     rows = []
 
-    for core in completed:
+    for core in cores:
 
-        row = dict(core)
+        row = dict(
+            core
+        )
 
         if cfg["type"] not in (
             "home_away",
-            "team_score_threshold"
+            "team_score",
+            "opp_at_most"
         ):
 
             try:
 
-                feed = get_mlb_game_feed(
-                    core["game_pk"]
-                )
-
                 row.update(
-                    mlb_metric_values(
-                        feed,
-                        core
+                    nhl_metrics(
+                        get_nhl_boxscore(
+                            core[
+                                "game_id"
+                            ]
+                        ),
+                        get_nhl_landing(
+                            core[
+                                "game_id"
+                            ]
+                        ),
+                        core,
+                        abbr
                     )
                 )
 
-            except Exception:
+            except:
 
-                row.update({
-                    "home_runs": None,
-                    "hits": None,
-                    "walks": None,
-                    "errors": None,
-                    "pitching_strikeouts": None,
-                    "scored_first": None,
-                    "quality_start": None,
-                    "starter_ip": None,
-                    "starter_er": None,
-                })
+                pass
 
-        row["expected_category"] = (
-            mlb_classify(
-                row,
-                cfg
-            )
+        row[
+            "expected_category"
+        ] = nhl_classify(
+            row,
+            cfg
         )
 
-        row["evidence"] = (
-            mlb_evidence_text(
-                row,
-                cfg
-            )
+        row[
+            "evidence"
+        ] = nhl_evidence(
+            row,
+            cfg
         )
 
-        rows.append(row)
+        rows.append(
+            row
+        )
 
-    return pd.DataFrame(rows)
+    return pd.DataFrame(
+        rows
+    )
 
 
 # ============================================================
-# Sport configuration
+# SPORT CONFIGURATION
 # ============================================================
 
 SPORTS = [
     "NBA",
-    "MLB"
+    "MLB",
+    "NHL"
 ]
 
-SPORT_SEASONS = {
+
+SEASONS = {
 
     "NBA": [
         "2025-26",
@@ -2187,19 +3197,34 @@ SPORT_SEASONS = {
         "2024",
         "2023",
         "2022"
+    ],
+
+    "NHL": [
+        "2025-26",
+        "2024-25",
+        "2023-24",
+        "2022-23"
     ]
 }
 
 
-def get_presets(sport):
+def presets_for(
+    sport
+):
 
-    if sport == "NBA":
-        return NBA_PRESETS
+    return {
+        "NBA":
+            NBA_PRESETS,
 
-    return MLB_PRESETS
+        "MLB":
+            MLB_PRESETS,
+
+        "NHL":
+            NHL_PRESETS
+    }[sport]
 
 
-def get_teams_for_sport(
+def teams_for(
     sport,
     season
 ):
@@ -2208,38 +3233,51 @@ def get_teams_for_sport(
 
         return get_nba_teams()
 
-    return get_mlb_teams(
-        int(season)
-    )
+    if sport == "MLB":
+
+        return get_mlb_teams(
+            int(season)
+        )
+
+    return get_nhl_teams()
 
 
-def build_dataset(
+def build_data(
     sport,
     team_id,
     season,
-    sample_size,
-    variable_name
+    sample,
+    variable
 ):
 
     if sport == "NBA":
 
-        return build_nba_dataset(
+        return build_nba(
             team_id,
             season,
-            sample_size,
-            variable_name
+            sample,
+            variable
         )
 
-    return build_mlb_dataset(
+    if sport == "MLB":
+
+        return build_mlb(
+            team_id,
+            season,
+            sample,
+            variable
+        )
+
+    return build_nhl(
         team_id,
-        int(season),
-        sample_size,
-        variable_name
+        season,
+        sample,
+        variable
     )
 
 
 # ============================================================
-# Header
+# APP HEADER
 # ============================================================
 
 st.markdown(
@@ -2252,6 +3290,7 @@ st.markdown(
     unsafe_allow_html=True
 )
 
+
 mode = st.radio(
     "Choose a mode",
     [
@@ -2263,7 +3302,7 @@ mode = st.radio(
 
 
 # ============================================================
-# Teacher Mode
+# TEACHER MODE
 # ============================================================
 
 if mode == "Teacher Assignment Builder":
@@ -2273,72 +3312,56 @@ if mode == "Teacher Assignment Builder":
     )
 
     st.write(
-        "Create a setup code so students cannot accidentally choose the wrong sport, team, season, variable, or sample."
+        "Create a code that locks the sport, team, season, variable, and sample."
     )
 
-    t_sport = st.selectbox(
+    sport = st.selectbox(
         "Sport",
         SPORTS,
-        key="teacher_sport"
+        key="t_sport"
     )
 
-    t_season = st.selectbox(
+    season = st.selectbox(
         "Season",
-        SPORT_SEASONS[
-            t_sport
+        SEASONS[
+            sport
         ],
-        key="teacher_season"
+        key="t_season"
     )
 
-    try:
+    teams = teams_for(
+        sport,
+        season
+    )
 
-        t_teams = (
-            get_teams_for_sport(
-                t_sport,
-                t_season
-            )
-        )
-
-    except Exception as e:
-
-        st.error(
-            "The team list could not be loaded."
-        )
-
-        st.code(
-            str(e)
-        )
-
-        st.stop()
-
-    t_team_names = [
+    team_names = [
         t["name"]
-        for t in t_teams
+        for t in teams
     ]
 
-    t_presets = get_presets(
-        t_sport
+    presets = presets_for(
+        sport
     )
 
     c1, c2 = st.columns(2)
 
     with c1:
 
-        t_team = st.selectbox(
+        team = st.selectbox(
             "Team",
-            t_team_names
+            team_names
         )
 
-        t_variable = st.selectbox(
+        variable = st.selectbox(
             "Categorical variable",
             list(
-                t_presets.keys()
+                presets.keys()
             )
         )
 
     with c2:
 
-        t_sample = st.selectbox(
+        sample = st.selectbox(
             "Sample size",
             [
                 10,
@@ -2348,15 +3371,15 @@ if mode == "Teacher Assignment Builder":
             index=2
         )
 
-    cfg = t_presets[
-        t_variable
+    cfg = presets[
+        variable
     ]
 
     st.info(
         "Research question: "
         + cfg["question"].replace(
             "the team",
-            t_team
+            team
         )
     )
 
@@ -2375,20 +3398,23 @@ if mode == "Teacher Assignment Builder":
         type="primary"
     ):
 
-        payload = {
-            "sport": t_sport,
-            "team": t_team,
-            "season": t_season,
-            "variable": t_variable,
-            "sample": t_sample
-        }
-
         st.success(
             "Assignment code created."
         )
 
         st.code(
-            encode_task(payload),
+            encode_task({
+                "sport":
+                    sport,
+                "team":
+                    team,
+                "season":
+                    season,
+                "variable":
+                    variable,
+                "sample":
+                    sample
+            }),
             language=None
         )
 
@@ -2400,17 +3426,20 @@ if mode == "Teacher Assignment Builder":
 
 
 # ============================================================
-# Student Mode
+# STUDENT MODE
 # ============================================================
 
 st.subheader(
     "Student Research"
 )
 
+
 task_code = st.text_input(
     "Have an assignment code? Paste it here (optional).",
-    placeholder="Paste teacher code here"
+    placeholder=
+        "Paste teacher code here"
 )
+
 
 preset = (
     decode_task(
@@ -2419,6 +3448,7 @@ preset = (
     if task_code.strip()
     else None
 )
+
 
 if (
     task_code.strip()
@@ -2429,7 +3459,8 @@ if (
         "That code could not be read. You can still choose the settings manually."
     )
 
-default_sport = (
+
+sport_default = (
     preset.get(
         "sport",
         "NBA"
@@ -2438,110 +3469,131 @@ default_sport = (
     else "NBA"
 )
 
-if default_sport not in SPORTS:
-    default_sport = "NBA"
+
+if sport_default not in SPORTS:
+
+    sport_default = "NBA"
+
 
 sport = st.selectbox(
     "1. Sport",
     SPORTS,
     index=SPORTS.index(
-        default_sport
+        sport_default
     ),
-    disabled=bool(preset)
+    disabled=bool(
+        preset
+    )
 )
 
-season_options = (
-    SPORT_SEASONS[
-        sport
-    ]
-)
 
-default_season = (
-    preset.get("season")
+season_opts = SEASONS[
+    sport
+]
+
+
+season_default = (
+    preset.get(
+        "season",
+        season_opts[0]
+    )
     if preset
-    else season_options[0]
+    else season_opts[0]
 )
+
 
 if (
-    default_season
-    not in season_options
+    season_default
+    not in season_opts
 ):
 
-    default_season = (
-        season_options[0]
+    season_default = (
+        season_opts[0]
     )
+
 
 season = st.selectbox(
     "2. Season",
-    season_options,
-    index=season_options.index(
-        default_season
+    season_opts,
+    index=season_opts.index(
+        season_default
     ),
-    disabled=bool(preset)
+    disabled=bool(
+        preset
+    )
 )
 
-try:
 
-    teams = get_teams_for_sport(
-        sport,
-        season
-    )
+teams = teams_for(
+    sport,
+    season
+)
 
-except Exception as e:
-
-    st.error(
-        "The team list could not be loaded."
-    )
-
-    st.code(
-        str(e)
-    )
-
-    st.stop()
 
 team_names = [
     t["name"]
     for t in teams
 ]
 
+
 team_map = {
-    t["name"]: t["id"]
+    t["name"]:
+        t["id"]
     for t in teams
 }
 
-default_team = (
-    preset.get("team")
+
+team_default = (
+    preset.get(
+        "team",
+        team_names[0]
+    )
     if preset
     else team_names[0]
 )
 
-if default_team not in team_names:
-    default_team = team_names[0]
 
-presets = get_presets(
+if (
+    team_default
+    not in team_names
+):
+
+    team_default = (
+        team_names[0]
+    )
+
+
+presets = presets_for(
     sport
 )
 
-variable_options = list(
+
+vars = list(
     presets.keys()
 )
 
-default_variable = (
-    preset.get("variable")
+
+var_default = (
+    preset.get(
+        "variable",
+        vars[0]
+    )
     if preset
-    else variable_options[0]
+    else vars[0]
 )
 
+
 if (
-    default_variable
-    not in variable_options
+    var_default
+    not in vars
 ):
 
-    default_variable = (
-        variable_options[0]
+    var_default = (
+        vars[0]
     )
 
-default_sample = (
+
+sample_default = (
     preset.get(
         "sample",
         20
@@ -2550,41 +3602,52 @@ default_sample = (
     else 20
 )
 
-if default_sample not in [
+
+if sample_default not in [
     10,
     15,
     20
 ]:
 
-    default_sample = 20
+    sample_default = 20
 
-c1, c2, c3 = st.columns(3)
+
+c1, c2, c3 = (
+    st.columns(3)
+)
+
 
 with c1:
 
-    team_name = st.selectbox(
+    team = st.selectbox(
         "3. Team",
         team_names,
         index=team_names.index(
-            default_team
+            team_default
         ),
-        disabled=bool(preset)
+        disabled=bool(
+            preset
+        )
     )
+
 
 with c2:
 
-    variable_name = st.selectbox(
+    variable = st.selectbox(
         "4. Variable",
-        variable_options,
-        index=variable_options.index(
-            default_variable
+        vars,
+        index=vars.index(
+            var_default
         ),
-        disabled=bool(preset)
+        disabled=bool(
+            preset
+        )
     )
+
 
 with c3:
 
-    sample_size = st.selectbox(
+    sample = st.selectbox(
         "5. Sample",
         [
             10,
@@ -2596,49 +3659,56 @@ with c3:
             15,
             20
         ].index(
-            default_sample
+            sample_default
         ),
-        disabled=bool(preset)
+        disabled=bool(
+            preset
+        )
     )
 
+
 cfg = presets[
-    variable_name
+    variable
 ]
 
-team_id = team_map[
-    team_name
-]
 
 st.markdown(
     '<div class="step-card">',
     unsafe_allow_html=True
 )
 
+
 st.write(
     "### Research Question"
 )
 
+
 st.write(
     cfg["question"].replace(
         "the team",
-        team_name
+        team
     )
 )
 
+
 st.write(
     f"**Variable A:** "
-    f"{cfg['a1']} / {cfg['a2']}"
+    f"{cfg['a1']} / "
+    f"{cfg['a2']}"
 )
+
 
 st.write(
     "**Outcome:** "
     "Win / Did Not Win"
 )
 
+
 st.markdown(
     '</div>',
     unsafe_allow_html=True
 )
+
 
 if st.button(
     "Load Game Data",
@@ -2649,22 +3719,26 @@ if st.button(
         "loaded_key"
     ] = (
         sport,
-        team_id,
-        team_name,
+        team_map[
+            team
+        ],
+        team,
         season,
-        sample_size,
-        variable_name
+        sample,
+        variable
     )
 
     st.session_state[
         "classification_ok"
     ] = False
 
-loaded_key = st.session_state.get(
+
+loaded = st.session_state.get(
     "loaded_key"
 )
 
-if not loaded_key:
+
+if not loaded:
 
     st.info(
         "Choose your investigation and click **Load Game Data**."
@@ -2672,24 +3746,26 @@ if not loaded_key:
 
     st.stop()
 
-(
-    loaded_sport,
-    loaded_team_id,
-    loaded_team_name,
-    loaded_season,
-    loaded_sample,
-    loaded_variable
-) = loaded_key
 
-loaded_presets = (
-    get_presets(
-        loaded_sport
-    )
+(
+    lsport,
+    lteam_id,
+    lteam,
+    lseason,
+    lsample,
+    lvar
+) = loaded
+
+
+lpresets = presets_for(
+    lsport
 )
 
-cfg = loaded_presets[
-    loaded_variable
+
+cfg = lpresets[
+    lvar
 ]
+
 
 with st.spinner(
     "Loading completed games and box-score data..."
@@ -2697,12 +3773,12 @@ with st.spinner(
 
     try:
 
-        df = build_dataset(
-            loaded_sport,
-            loaded_team_id,
-            loaded_season,
-            loaded_sample,
-            loaded_variable
+        df = build_data(
+            lsport,
+            lteam_id,
+            lseason,
+            lsample,
+            lvar
         )
 
     except Exception as e:
@@ -2717,6 +3793,7 @@ with st.spinner(
 
         st.stop()
 
+
 if df.empty:
 
     st.error(
@@ -2724,6 +3801,7 @@ if df.empty:
     )
 
     st.stop()
+
 
 missing = int(
     df[
@@ -2733,20 +3811,25 @@ missing = int(
     .sum()
 )
 
+
 if missing:
 
     st.warning(
         f"{missing} game(s) are missing the statistic needed for this variable. "
-        "Those rows were left out of the classification activity."
+        "Those rows were left out."
     )
+
 
 df_valid = (
     df[
-        df["expected_category"]
+        df[
+            "expected_category"
+        ]
         .notna()
     ]
     .copy()
 )
+
 
 if df_valid.empty:
 
@@ -2756,15 +3839,22 @@ if df_valid.empty:
 
     st.stop()
 
+
+# ============================================================
+# STEP 1
+# ============================================================
+
 st.write(
     "## Step 1 — Examine the evidence"
 )
+
 
 st.caption(
     "Do not jump straight to the category. Look at the evidence first."
 )
 
-student_table = (
+
+table = (
     df_valid[
         [
             "date",
@@ -2776,31 +3866,42 @@ student_table = (
     .copy()
 )
 
-student_table.columns = [
+
+table.columns = [
     "Date",
     "Opponent",
-    cfg["evidence_label"],
+    cfg[
+        "evidence_label"
+    ],
     "Outcome"
 ]
 
-student_table.insert(
+
+table.insert(
     0,
     "Game",
     range(
         1,
-        len(student_table) + 1
+        len(table) + 1
     )
 )
 
+
 st.dataframe(
-    student_table,
+    table,
     use_container_width=True,
     hide_index=True
 )
 
+
+# ============================================================
+# STEP 2
+# ============================================================
+
 st.write(
     "## Step 2 — Classify each game"
 )
+
 
 st.caption(
     f"For each row, choose "
@@ -2808,22 +3909,14 @@ st.caption(
     f"**{cfg['a2']}**."
 )
 
-edit = (
-    student_table[
-        [
-            "Game",
-            "Date",
-            "Opponent",
-            cfg["evidence_label"],
-            "Outcome"
-        ]
-    ]
-    .copy()
-)
+
+edit = table.copy()
+
 
 edit[
     "Your Category"
 ] = ""
+
 
 edited = st.data_editor(
     edit,
@@ -2833,7 +3926,9 @@ edited = st.data_editor(
         "Game",
         "Date",
         "Opponent",
-        cfg["evidence_label"],
+        cfg[
+            "evidence_label"
+        ],
         "Outcome"
     ],
     column_config={
@@ -2850,13 +3945,14 @@ edited = st.data_editor(
     },
     key=(
         f"editor_"
-        f"{loaded_sport}_"
-        f"{loaded_team_id}_"
-        f"{loaded_season}_"
-        f"{loaded_variable}_"
-        f"{loaded_sample}"
+        f"{lsport}_"
+        f"{lteam_id}_"
+        f"{lseason}_"
+        f"{lvar}_"
+        f"{lsample}"
     )
 )
+
 
 if st.button(
     "Check My Classifications"
@@ -2885,41 +3981,38 @@ if st.button(
         )
     ]
 
-    num_correct = sum(
-        correct
-    )
-
     st.session_state[
         "classification_ok"
-    ] = all(correct)
+    ] = all(
+        correct
+    )
 
     if all(correct):
 
         st.success(
-            f"Perfect — {num_correct} of {len(correct)} classifications are correct."
+            f"Perfect — {sum(correct)} of {len(correct)} classifications are correct."
         )
 
     else:
 
         st.warning(
-            f"{num_correct} of {len(correct)} are correct. "
+            f"{sum(correct)} of {len(correct)} are correct. "
             "Fix the row numbers below and check again."
         )
-
-        wrong_games = [
-            str(i + 1)
-            for i, ok
-            in enumerate(correct)
-            if not ok
-        ]
 
         st.write(
             "Rows to fix: **"
             + ", ".join(
-                wrong_games
+                str(i + 1)
+                for i, ok
+                in enumerate(
+                    correct
+                )
+                if not ok
             )
             + "**"
         )
+
 
 if not st.session_state.get(
     "classification_ok",
@@ -2932,9 +4025,15 @@ if not st.session_state.get(
 
     st.stop()
 
+
+# ============================================================
+# STEP 3
+# ============================================================
+
 st.write(
     "## Step 3 — Build the two-way table"
 )
+
 
 tw = two_way(
     df_valid,
@@ -2942,62 +4041,75 @@ tw = two_way(
     cfg["a2"]
 )
 
+
 st.dataframe(
     tw,
     use_container_width=True
 )
 
-a1_win = int(
+
+a1w = int(
     tw.loc[
         cfg["a1"],
         "Win"
     ]
 )
 
-a1_total = int(
+
+a1t = int(
     tw.loc[
         cfg["a1"],
         "Total"
     ]
 )
 
-a2_win = int(
+
+a2w = int(
     tw.loc[
         cfg["a2"],
         "Win"
     ]
 )
 
-a2_total = int(
+
+a2t = int(
     tw.loc[
         cfg["a2"],
         "Total"
     ]
 )
+
 
 p1 = percent(
-    a1_win,
-    a1_total
+    a1w,
+    a1t
 )
 
+
 p2 = percent(
-    a2_win,
-    a2_total
+    a2w,
+    a2t
 )
+
 
 diff = abs(
     p1 - p2
 )
 
+
+# ============================================================
+# STEP 4
+# ============================================================
+
 st.write(
     "## Step 4 — Conditional percentages"
 )
 
-pcol1, pcol2 = (
-    st.columns(2)
-)
 
-with pcol1:
+c1, c2 = st.columns(2)
+
+
+with c1:
 
     st.metric(
         cfg["a1"],
@@ -3005,10 +4117,11 @@ with pcol1:
     )
 
     st.caption(
-        f"{a1_win} ÷ {a1_total} × 100 = {p1:.1f}%"
+        f"{a1w} ÷ {a1t} × 100 = {p1:.1f}%"
     )
 
-with pcol2:
+
+with c2:
 
     st.metric(
         cfg["a2"],
@@ -3016,34 +4129,40 @@ with pcol2:
     )
 
     st.caption(
-        f"{a2_win} ÷ {a2_total} × 100 = {p2:.1f}%"
+        f"{a2w} ÷ {a2t} × 100 = {p2:.1f}%"
     )
+
 
 st.metric(
     "Difference",
     f"{diff:.1f} percentage points"
 )
 
-chart_df = pd.DataFrame({
-    "Category": [
-        cfg["a1"],
-        cfg["a2"]
-    ],
-    "Win %": [
-        p1,
-        p2
-    ]
-}).set_index(
-    "Category"
-)
 
 st.bar_chart(
-    chart_df
+    pd.DataFrame({
+        "Category": [
+            cfg["a1"],
+            cfg["a2"]
+        ],
+        "Win %": [
+            p1,
+            p2
+        ]
+    }).set_index(
+        "Category"
+    )
 )
+
+
+# ============================================================
+# STEP 5
+# ============================================================
 
 st.write(
     "## Step 5 — Write the verdict"
 )
+
 
 st.markdown(
     f"""
@@ -3071,6 +4190,7 @@ The difference was
     unsafe_allow_html=True
 )
 
+
 st.radio(
     "Do the variables appear associated in this sample?",
     [
@@ -3081,33 +4201,48 @@ st.radio(
     horizontal=True
 )
 
+
 st.text_area(
     "Explain your reasoning using both percentages.",
-    placeholder="Our data suggests ... because ..."
+    placeholder=
+        "Our data suggests ... because ..."
 )
+
 
 st.text_area(
     "Name one limitation of the investigation.",
-    placeholder="One limitation is ..."
+    placeholder=
+        "One limitation is ..."
 )
+
 
 st.caption(
     "Reminder: an association does not prove that one variable caused the other."
 )
 
+
 with st.expander(
     "Source information"
 ):
 
-    if loaded_sport == "NBA":
+    if lsport == "NBA":
 
         st.write(
-            "NBA schedules and box-score statistics in this version are retrieved from ESPN's public sports data endpoints."
+            "NBA schedules and box-score statistics are retrieved from ESPN public sports data endpoints."
+        )
+
+    elif lsport == "MLB":
+
+        st.write(
+            "MLB schedules and game feeds are retrieved from MLB's Stats API."
         )
 
     else:
 
         st.write(
-            "MLB schedules and game feeds in this version are retrieved from MLB's Stats API. "
-            "Students should still record the original game schedule or box score in their project source log."
+            "NHL schedules, box scores, and scoring summaries are retrieved from the NHL Web API."
         )
+
+    st.write(
+        "Students should still record the original game schedule or box score in their project source log."
+    )
