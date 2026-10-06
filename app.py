@@ -22,6 +22,8 @@ MLS_BASE = "https://site.api.espn.com/apis/site/v2/sports/soccer/usa.1"
 MLB_BASE = "https://statsapi.mlb.com/api/v1"
 NHL_BASE = "https://api-web.nhle.com/v1"
 
+SAMPLE_OPTIONS = [10, 15, 20, 40]
+
 
 # ============================================================
 # STYLE
@@ -43,7 +45,7 @@ st.markdown(
 
 .subtitle {
     font-size: 1.05rem;
-    opacity: .80;
+    opacity: .8;
     margin-bottom: 1rem;
 }
 
@@ -59,11 +61,6 @@ st.markdown(
     padding: 12px 14px;
     border-radius: 8px;
     background: rgba(46,125,50,.08);
-}
-
-.small-note {
-    font-size: .9rem;
-    opacity: .75;
 }
 </style>
 """,
@@ -113,6 +110,7 @@ def as_number(value):
         ]:
             if key in value:
                 result = as_number(value[key])
+
                 if result is not None:
                     return result
 
@@ -127,6 +125,7 @@ def as_number(value):
 
     try:
         return float(text)
+
     except Exception:
         return None
 
@@ -155,6 +154,7 @@ def format_date(value):
         return pd.to_datetime(value).strftime(
             "%b %d, %Y"
         )
+
     except Exception:
         return str(value)[:10]
 
@@ -188,7 +188,11 @@ def decode_task(code):
         return None
 
 
-def two_way_table(df, category_1, category_2):
+def two_way_table(
+    df,
+    category_1,
+    category_2,
+):
     table = pd.crosstab(
         df["expected_category"],
         df["result"],
@@ -288,7 +292,10 @@ def classify_row(row, cfg):
             cfg["metric"]
         )
 
-        if value is None or pd.isna(value):
+        if (
+            value is None
+            or pd.isna(value)
+        ):
             return None
 
         return (
@@ -302,7 +309,10 @@ def classify_row(row, cfg):
             cfg["metric"]
         )
 
-        if value is None or pd.isna(value):
+        if (
+            value is None
+            or pd.isna(value)
+        ):
             return None
 
         return (
@@ -325,7 +335,7 @@ def classify_row(row, cfg):
             else cfg["a2"]
         )
 
-    if kind == "more":
+    if kind in ["more", "fewer"]:
         first = row.get(
             cfg["m1"]
         )
@@ -342,28 +352,12 @@ def classify_row(row, cfg):
         ):
             return None
 
-        return (
-            cfg["a1"]
-            if float(first) > float(second)
-            else cfg["a2"]
-        )
-
-    if kind == "fewer":
-        first = row.get(
-            cfg["m1"]
-        )
-
-        second = row.get(
-            cfg["m2"]
-        )
-
-        if (
-            first is None
-            or second is None
-            or pd.isna(first)
-            or pd.isna(second)
-        ):
-            return None
+        if kind == "more":
+            return (
+                cfg["a1"]
+                if float(first) > float(second)
+                else cfg["a2"]
+            )
 
         return (
             cfg["a1"]
@@ -436,7 +430,10 @@ def evidence_text(row, cfg):
             cfg["metric"]
         )
 
-        if value is None or pd.isna(value):
+        if (
+            value is None
+            or pd.isna(value)
+        ):
             return "Unavailable"
 
         return f"{float(value):.1f}%"
@@ -446,7 +443,10 @@ def evidence_text(row, cfg):
             cfg["metric"]
         )
 
-        if value is None or pd.isna(value):
+        if (
+            value is None
+            or pd.isna(value)
+        ):
             return "Unavailable"
 
         return f"{float(value):.3f}"
@@ -500,7 +500,10 @@ def evidence_text(row, cfg):
     if metric:
         value = row.get(metric)
 
-        if value is None or pd.isna(value):
+        if (
+            value is None
+            or pd.isna(value)
+        ):
             return "Unavailable"
 
         return f"{float(value):g}"
@@ -509,106 +512,8 @@ def evidence_text(row, cfg):
 
 
 # ============================================================
-# NBA
+# ESPN COMMON HELPERS
 # ============================================================
-
-@st.cache_data(
-    ttl=3600,
-    show_spinner=False,
-)
-def get_nba_teams():
-    data = safe_get(
-        f"{NBA_BASE}/teams"
-    )
-
-    teams = []
-
-    sports = data.get(
-        "sports",
-        [],
-    )
-
-    if sports:
-        leagues = sports[0].get(
-            "leagues",
-            [],
-        )
-
-        if leagues:
-            for item in leagues[0].get(
-                "teams",
-                [],
-            ):
-                team = item.get(
-                    "team",
-                    {},
-                )
-
-                if (
-                    team.get("id")
-                    and team.get("displayName")
-                ):
-                    teams.append({
-                        "id": str(team["id"]),
-                        "name": team["displayName"],
-                    })
-
-    return sorted(
-        teams,
-        key=lambda x: x["name"],
-    )
-
-
-def nba_season_id(label):
-    match = re.match(
-        r"(\d{4})-(\d{2})",
-        label,
-    )
-
-    if match:
-        return int(
-            match.group(1)
-        ) + 1
-
-    return int(label)
-
-
-@st.cache_data(
-    ttl=1800,
-    show_spinner=False,
-)
-def get_nba_schedule(
-    team_id,
-    season,
-):
-    data = safe_get(
-        f"{NBA_BASE}/teams/{team_id}/schedule",
-        params={
-            "season": nba_season_id(
-                season
-            ),
-            "seasontype": 2,
-        },
-    )
-
-    return data.get(
-        "events",
-        [],
-    )
-
-
-@st.cache_data(
-    ttl=86400,
-    show_spinner=False,
-)
-def get_nba_summary(event_id):
-    return safe_get(
-        f"{NBA_BASE}/summary",
-        params={
-            "event": event_id,
-        },
-    )
-
 
 def espn_game_core(
     event,
@@ -645,6 +550,7 @@ def espn_game_core(
 
         if competitor_id == str(team_id):
             team_comp = competitor
+
         else:
             opp_comp = competitor
 
@@ -672,12 +578,14 @@ def espn_game_core(
                 "",
             )
         ),
+
         "date": format_date(
             event.get(
                 "date",
                 "",
             )
         ),
+
         "opponent": (
             opp_comp
             .get(
@@ -689,6 +597,7 @@ def espn_game_core(
                 "Opponent",
             )
         ),
+
         "home_away": (
             "Home"
             if team_comp.get(
@@ -696,12 +605,13 @@ def espn_game_core(
             ) == "home"
             else "Away"
         ),
-        "team_score": int(
-            round(team_score)
-        ),
-        "opp_score": int(
-            round(opp_score)
-        ),
+
+        "team_score":
+            int(round(team_score)),
+
+        "opp_score":
+            int(round(opp_score)),
+
         "result": (
             "Win"
             if team_score > opp_score
@@ -800,6 +710,110 @@ def find_stat(stats, names):
     return None
 
 
+# ============================================================
+# NBA
+# ============================================================
+
+@st.cache_data(
+    ttl=3600,
+    show_spinner=False,
+)
+def get_nba_teams():
+    data = safe_get(
+        f"{NBA_BASE}/teams"
+    )
+
+    teams = []
+
+    sports = data.get(
+        "sports",
+        [],
+    )
+
+    if sports:
+        leagues = sports[0].get(
+            "leagues",
+            [],
+        )
+
+        if leagues:
+            for item in leagues[0].get(
+                "teams",
+                [],
+            ):
+                team = item.get(
+                    "team",
+                    {},
+                )
+
+                if (
+                    team.get("id")
+                    and team.get("displayName")
+                ):
+                    teams.append({
+                        "id": str(team["id"]),
+                        "name": team["displayName"],
+                    })
+
+    return sorted(
+        teams,
+        key=lambda x: x["name"],
+    )
+
+
+def nba_season_id(label):
+    match = re.match(
+        r"(\d{4})-(\d{2})",
+        label,
+    )
+
+    if match:
+        return int(
+            match.group(1)
+        ) + 1
+
+    return int(label)
+
+
+@st.cache_data(
+    ttl=1800,
+    show_spinner=False,
+)
+def get_nba_schedule(
+    team_id,
+    season,
+):
+    data = safe_get(
+        f"{NBA_BASE}/teams/{team_id}/schedule",
+        params={
+            "season":
+                nba_season_id(
+                    season
+                ),
+            "seasontype":
+                2,
+        },
+    )
+
+    return data.get(
+        "events",
+        [],
+    )
+
+
+@st.cache_data(
+    ttl=86400,
+    show_spinner=False,
+)
+def get_nba_summary(event_id):
+    return safe_get(
+        f"{NBA_BASE}/summary",
+        params={
+            "event": event_id,
+        },
+    )
+
+
 def nba_halftime(
     summary,
     team_id,
@@ -853,6 +867,7 @@ def nba_halftime(
 
         if competitor_id == str(team_id):
             team_lines = values
+
         else:
             opp_lines = values
 
@@ -1071,8 +1086,10 @@ NBA_PRESETS = {
         "m2": "halftime_opp",
         "a1": "Led at Halftime",
         "a2": "Did Not Lead at Halftime",
-        "evidence_label": "Halftime score",
-        "evidence_type": "score_comparison",
+        "evidence_label":
+            "Halftime score",
+        "evidence_type":
+            "score_comparison",
         "question":
             "Does leading at halftime appear associated with whether the team wins?",
     },
@@ -1163,7 +1180,9 @@ def build_nba(
                 row.update(
                     nba_metrics(
                         get_nba_summary(
-                            game["event_id"]
+                            game[
+                                "event_id"
+                            ]
                         ),
                         team_id,
                     )
@@ -1219,13 +1238,17 @@ def get_mlb_teams(season):
             and team.get("name")
         ):
             teams.append({
-                "id": str(team["id"]),
-                "name": team["name"],
+                "id": str(
+                    team["id"]
+                ),
+                "name":
+                    team["name"],
             })
 
     return sorted(
         teams,
-        key=lambda x: x["name"],
+        key=lambda x:
+            x["name"],
     )
 
 
@@ -1348,6 +1371,7 @@ def mlb_core(
                 "",
             )
         ),
+
         "date": format_date(
             game.get(
                 "gameDate",
@@ -1357,6 +1381,7 @@ def mlb_core(
                 ),
             )
         ),
+
         "opponent": (
             opp.get(
                 "team",
@@ -1366,14 +1391,19 @@ def mlb_core(
                 "Opponent",
             )
         ),
+
         "home_away":
             home_away,
+
         "team_side":
             side,
+
         "team_score":
             int(team_score),
+
         "opp_score":
             int(opp_score),
+
         "result": (
             "Win"
             if team_score > opp_score
@@ -1457,7 +1487,8 @@ def mlb_scored_first(
             )
 
             return (
-                scoring_side == side
+                scoring_side
+                == side
             )
 
     return None
@@ -1537,13 +1568,9 @@ def mlb_quality_start(
             earned_runs,
         )
 
-    quality_start = (
-        innings >= 6
-        and earned_runs <= 3
-    )
-
     return (
-        quality_start,
+        innings >= 6
+        and earned_runs <= 3,
         innings,
         earned_runs,
     )
@@ -1582,15 +1609,11 @@ def mlb_metrics(
 
     return {
         "home_runs": as_number(
-            batting.get(
-                "homeRuns"
-            )
+            batting.get("homeRuns")
         ),
 
         "hits": as_number(
-            batting.get(
-                "hits"
-            )
+            batting.get("hits")
         ),
 
         "walks": as_number(
@@ -1600,9 +1623,7 @@ def mlb_metrics(
         ),
 
         "errors": as_number(
-            fielding.get(
-                "errors"
-            )
+            fielding.get("errors")
         ),
 
         "pitching_strikeouts":
@@ -1665,9 +1686,12 @@ MLB_PRESETS = {
     },
 
     "Committed at least 1 error": {
-        "type": "metric_at_least",
-        "metric": "errors",
-        "threshold": 1,
+        "type":
+            "metric_at_least",
+        "metric":
+            "errors",
+        "threshold":
+            1,
         "a1":
             "Committed 1 Plus Error",
         "a2":
@@ -1681,9 +1705,12 @@ MLB_PRESETS = {
     "Scored at least 5 runs": {
         "type":
             "team_score_at_least",
-        "threshold": 5,
-        "a1": "5 Plus Runs",
-        "a2": "Under 5 Runs",
+        "threshold":
+            5,
+        "a1":
+            "5 Plus Runs",
+        "a2":
+            "Under 5 Runs",
         "evidence_label":
             "Team runs",
         "evidence_type":
@@ -1838,13 +1865,11 @@ def build_mlb(
             "team_score_at_least",
         ]:
             try:
-                feed = get_mlb_feed(
-                    game["game_pk"]
-                )
-
                 row.update(
                     mlb_metrics(
-                        feed,
+                        get_mlb_feed(
+                            game["game_pk"]
+                        ),
                         game,
                     )
                 )
@@ -1973,9 +1998,9 @@ def get_nhl_boxscore(game_id):
     ttl=86400,
     show_spinner=False,
 )
-def get_nhl_landing(game_id):
+def get_nhl_play_by_play(game_id):
     return safe_get(
-        f"{NHL_BASE}/gamecenter/{game_id}/landing"
+        f"{NHL_BASE}/gamecenter/{game_id}/play-by-play"
     )
 
 
@@ -1983,7 +2008,7 @@ def nhl_core(
     game,
     abbr,
 ):
-    # 2 = NHL regular season
+    # gameType 2 = regular season
     if game.get("gameType") != 2:
         return None
 
@@ -2074,22 +2099,29 @@ def nhl_core(
                 "",
             )
         ),
+
         "date": format_date(
             game.get(
                 "gameDate",
                 "",
             )
         ),
+
         "opponent":
             opponent_name,
+
         "home_away":
             home_away,
+
         "team_side":
             team_side,
+
         "team_score":
             int(team_score),
+
         "opp_score":
             int(opp_score),
+
         "result": (
             "Win"
             if team_score > opp_score
@@ -2098,130 +2130,186 @@ def nhl_core(
     }
 
 
-# ============================================================
-# NHL SCORING FIX
-# ============================================================
-
-def nhl_goal_team_abbr(goal):
-    value = goal.get(
-        "teamAbbrev"
-    )
-
-    if isinstance(
-        value,
-        dict,
-    ):
-        return value.get(
-            "default"
-        )
-
-    if isinstance(
-        value,
-        str,
-    ):
-        return value
-
-    fallback = goal.get(
-        "eventOwnerTeamAbbrev"
-    )
-
-    if isinstance(
-        fallback,
-        dict,
-    ):
-        return fallback.get(
-            "default"
-        )
-
-    return fallback
-
-
-def nhl_scoring_metrics(
-    landing,
-    abbr,
+def nhl_team_numeric_id(
+    box,
+    team_side,
 ):
+    team = box.get(
+        team_side,
+        {},
+    )
+
+    team_id = team.get("id")
+
+    if team_id is None:
+        return None
+
+    try:
+        return int(team_id)
+
+    except Exception:
+        return None
+
+
+def nhl_pbp_scoring_metrics(
+    pbp,
+    box,
+    core,
+):
+    team_side = core[
+        "team_side"
+    ]
+
+    team_id = nhl_team_numeric_id(
+        box,
+        team_side,
+    )
+
+    if team_id is None:
+        return {
+            "scored_first": None,
+            "first_period_team": None,
+            "first_period_opp": None,
+            "power_play_goals": None,
+        }
+
+    plays = pbp.get(
+        "plays",
+        [],
+    )
+
     goals = []
 
-    for period_block in landing.get(
-        "scoring",
-        [],
-    ):
-        period_number = (
-            period_block
-            .get(
+    for index, play in enumerate(plays):
+        event_type = str(
+            play.get(
+                "typeDescKey",
+                "",
+            )
+        ).lower()
+
+        type_code = play.get(
+            "typeCode"
+        )
+
+        if (
+            event_type != "goal"
+            and type_code != 505
+        ):
+            continue
+
+        details = play.get(
+            "details",
+            {},
+        )
+
+        owner_id = details.get(
+            "eventOwnerTeamId"
+        )
+
+        if owner_id is None:
+            continue
+
+        try:
+            owner_id = int(
+                owner_id
+            )
+
+        except Exception:
+            continue
+
+        period = (
+            play.get(
                 "periodDescriptor",
                 {},
-            )
-            .get(
+            ).get(
                 "number"
             )
         )
 
-        for goal in period_block.get(
-            "goals",
-            [],
-        ):
-            team_abbr = nhl_goal_team_abbr(
-                goal
+        if period is None:
+            period = play.get(
+                "period"
             )
 
-            if not team_abbr:
-                continue
-
-            strength = str(
-                goal.get(
+        strength = str(
+            details.get(
+                "strength",
+                play.get(
                     "strength",
                     "",
-                )
-            ).upper()
-
-            goals.append({
-                "team": team_abbr,
-                "period": period_number,
-                "time": goal.get(
-                    "timeInPeriod",
-                    "",
                 ),
-                "strength": strength,
-            })
+            )
+        ).upper()
 
-    # NHL supplies scoring blocks chronologically.
-    # The first goal found is therefore the first goal of the game.
-    if goals:
-        first_goal_team = (
-            goals[0]["team"]
-        )
+        goals.append({
+            "team_id":
+                owner_id,
 
-        scored_first = (
-            first_goal_team == abbr
-        )
+            "period":
+                period,
 
-    else:
-        scored_first = None
+            "sort_order":
+                play.get(
+                    "sortOrder",
+                    index,
+                ),
+
+            "strength":
+                strength,
+        })
+
+    if not goals:
+        return {
+            "scored_first": None,
+            "first_period_team": None,
+            "first_period_opp": None,
+            "power_play_goals": None,
+        }
+
+    goals = sorted(
+        goals,
+        key=lambda goal:
+            goal["sort_order"],
+    )
+
+    scored_first = (
+        goals[0][
+            "team_id"
+        ] == team_id
+    )
 
     first_period_team = 0
     first_period_opp = 0
     power_play_goals = 0
 
     for goal in goals:
-        if goal["period"] == 1:
-            if goal["team"] == abbr:
+        if goal[
+            "period"
+        ] == 1:
+            if (
+                goal["team_id"]
+                == team_id
+            ):
                 first_period_team += 1
+
             else:
                 first_period_opp += 1
 
-        strength = goal["strength"]
+        if goal[
+            "team_id"
+        ] == team_id:
+            strength = goal[
+                "strength"
+            ]
 
-        if (
-            goal["team"] == abbr
-            and (
+            if (
                 strength == "PP"
                 or strength == "PPG"
-                or "POWER PLAY" in strength
+                or "POWER" in strength
                 or strength.startswith("PP")
-            )
-        ):
-            power_play_goals += 1
+            ):
+                power_play_goals += 1
 
     return {
         "scored_first":
@@ -2312,9 +2400,8 @@ def nhl_goalie_save_pct(
 
 def nhl_metrics(
     box,
-    landing,
+    pbp,
     core,
-    abbr,
 ):
     team_side = core[
         "team_side"
@@ -2336,28 +2423,51 @@ def nhl_metrics(
         {},
     )
 
-    metrics = nhl_scoring_metrics(
-        landing,
-        abbr,
+    scoring = (
+        nhl_pbp_scoring_metrics(
+            pbp,
+            box,
+            core,
+        )
     )
 
-    metrics.update({
-        "team_sog": as_number(
-            team.get("sog")
-        ),
+    return {
+        "scored_first":
+            scoring[
+                "scored_first"
+            ],
 
-        "opp_sog": as_number(
-            opponent.get("sog")
-        ),
+        "first_period_team":
+            scoring[
+                "first_period_team"
+            ],
+
+        "first_period_opp":
+            scoring[
+                "first_period_opp"
+            ],
+
+        "power_play_goals":
+            scoring[
+                "power_play_goals"
+            ],
+
+        "team_sog":
+            as_number(
+                team.get("sog")
+            ),
+
+        "opp_sog":
+            as_number(
+                opponent.get("sog")
+            ),
 
         "save_pct":
             nhl_goalie_save_pct(
                 box,
                 team_side,
             ),
-    })
-
-    return metrics
+    }
 
 
 NHL_PRESETS = {
@@ -2376,7 +2486,8 @@ NHL_PRESETS = {
         "metric": "scored_first",
         "a1": "Scored First",
         "a2": "Did Not Score First",
-        "evidence_label": "First goal",
+        "evidence_label":
+            "First goal",
         "evidence_type":
             "boolean_first",
         "question":
@@ -2386,7 +2497,8 @@ NHL_PRESETS = {
     "Scored at least 4 goals": {
         "type":
             "team_score_at_least",
-        "threshold": 4,
+        "threshold":
+            4,
         "a1":
             "4 Plus Goals",
         "a2":
@@ -2400,11 +2512,16 @@ NHL_PRESETS = {
     },
 
     "More shots than opponent": {
-        "type": "more",
-        "m1": "team_sog",
-        "m2": "opp_sog",
-        "a1": "More Shots",
-        "a2": "Not More Shots",
+        "type":
+            "more",
+        "m1":
+            "team_sog",
+        "m2":
+            "opp_sog",
+        "a1":
+            "More Shots",
+        "a2":
+            "Not More Shots",
         "evidence_label":
             "Team SOG vs. opponent SOG",
         "evidence_type":
@@ -2570,37 +2687,42 @@ def build_nhl(
         ]:
             try:
                 box = get_nhl_boxscore(
-                    game["game_id"]
+                    game[
+                        "game_id"
+                    ]
                 )
 
-                landing = get_nhl_landing(
-                    game["game_id"]
+                pbp = (
+                    get_nhl_play_by_play(
+                        game[
+                            "game_id"
+                        ]
+                    )
                 )
 
                 row.update(
                     nhl_metrics(
                         box,
-                        landing,
+                        pbp,
                         game,
-                        abbr,
                     )
                 )
 
             except Exception:
                 pass
 
-        row["expected_category"] = (
-            classify_row(
-                row,
-                cfg,
-            )
+        row[
+            "expected_category"
+        ] = classify_row(
+            row,
+            cfg,
         )
 
-        row["evidence"] = (
-            evidence_text(
-                row,
-                cfg,
-            )
+        row[
+            "evidence"
+        ] = evidence_text(
+            row,
+            cfg,
         )
 
         rows.append(row)
@@ -2646,16 +2768,26 @@ def get_mls_teams():
 
                 if (
                     team.get("id")
-                    and team.get("displayName")
+                    and team.get(
+                        "displayName"
+                    )
                 ):
                     teams.append({
-                        "id": str(team["id"]),
-                        "name": team["displayName"],
+                        "id":
+                            str(
+                                team["id"]
+                            ),
+
+                        "name":
+                            team[
+                                "displayName"
+                            ],
                     })
 
     return sorted(
         teams,
-        key=lambda x: x["name"],
+        key=lambda x:
+            x["name"],
     )
 
 
@@ -2670,7 +2802,8 @@ def get_mls_schedule(
     data = safe_get(
         f"{MLS_BASE}/teams/{team_id}/schedule",
         params={
-            "season": int(season),
+            "season":
+                int(season),
         },
     )
 
@@ -2688,7 +2821,8 @@ def get_mls_summary(event_id):
     return safe_get(
         f"{MLS_BASE}/summary",
         params={
-            "event": event_id,
+            "event":
+                event_id,
         },
     )
 
@@ -2705,10 +2839,8 @@ def mls_core(
     if not competitions:
         return None
 
-    competition = competitions[0]
-
     status = (
-        competition
+        competitions[0]
         .get(
             "status",
             {},
@@ -2778,13 +2910,11 @@ def mls_scored_first(
     )
 
     for play in plays:
-        is_score = (
+        if (
             play.get(
                 "scoringPlay"
-            ) is True
-        )
-
-        if not is_score:
+            ) is not True
+        ):
             continue
 
         scoring_team_id = str(
@@ -2916,27 +3046,29 @@ def mls_metrics(
             )
         ),
 
-        "shots_on_target": as_number(
-            find_stat(
-                team_stats,
-                [
-                    "shotsOnTarget",
-                    "Shots on Target",
-                    "shots on goal",
-                ],
-            )
-        ),
+        "shots_on_target":
+            as_number(
+                find_stat(
+                    team_stats,
+                    [
+                        "shotsOnTarget",
+                        "Shots on Target",
+                        "shots on goal",
+                    ],
+                )
+            ),
 
-        "possession_pct": parse_percent(
-            find_stat(
-                team_stats,
-                [
-                    "possessionPct",
-                    "possession",
-                    "Possession",
-                ],
-            )
-        ),
+        "possession_pct":
+            parse_percent(
+                find_stat(
+                    team_stats,
+                    [
+                        "possessionPct",
+                        "possession",
+                        "Possession",
+                    ],
+                )
+            ),
 
         "scored_first":
             mls_scored_first(
@@ -2954,21 +3086,31 @@ def mls_metrics(
 
 MLS_PRESETS = {
     "Home vs. Away": {
-        "type": "home_away",
-        "a1": "Home",
-        "a2": "Away",
-        "evidence_label": "Location",
-        "evidence_type": "location",
+        "type":
+            "home_away",
+        "a1":
+            "Home",
+        "a2":
+            "Away",
+        "evidence_label":
+            "Location",
+        "evidence_type":
+            "location",
         "question":
             "Does playing at home appear associated with whether the team wins?",
     },
 
     "Scored first": {
-        "type": "boolean",
-        "metric": "scored_first",
-        "a1": "Scored First",
-        "a2": "Did Not Score First",
-        "evidence_label": "First goal",
+        "type":
+            "boolean",
+        "metric":
+            "scored_first",
+        "a1":
+            "Scored First",
+        "a2":
+            "Did Not Score First",
+        "evidence_label":
+            "First goal",
         "evidence_type":
             "boolean_first",
         "question":
@@ -2978,7 +3120,8 @@ MLS_PRESETS = {
     "Scored at least 2 goals": {
         "type":
             "team_score_at_least",
-        "threshold": 2,
+        "threshold":
+            2,
         "a1":
             "2 Plus Goals",
         "a2":
@@ -3166,13 +3309,13 @@ def build_mls(
             "opp_score_at_most",
         ]:
             try:
-                summary = get_mls_summary(
-                    game["event_id"]
-                )
-
                 row.update(
                     mls_metrics(
-                        summary,
+                        get_mls_summary(
+                            game[
+                                "event_id"
+                            ]
+                        ),
                         team_id,
                     )
                 )
@@ -3180,18 +3323,18 @@ def build_mls(
             except Exception:
                 pass
 
-        row["expected_category"] = (
-            classify_row(
-                row,
-                cfg,
-            )
+        row[
+            "expected_category"
+        ] = classify_row(
+            row,
+            cfg,
         )
 
-        row["evidence"] = (
-            evidence_text(
-                row,
-                cfg,
-            )
+        row[
+            "evidence"
+        ] = evidence_text(
+            row,
+            cfg,
         )
 
         rows.append(row)
@@ -3343,13 +3486,12 @@ mode = st.radio(
 # ============================================================
 
 if mode == "Teacher Assignment Builder":
-
     st.subheader(
         "Teacher Assignment Builder"
     )
 
     st.write(
-        "Create a code that locks the sport, team, season, variable, and sample for students."
+        "Create a code that locks the sport, team, season, variable, and sample."
     )
 
     teacher_sport = st.selectbox(
@@ -3376,7 +3518,11 @@ if mode == "Teacher Assignment Builder":
         st.error(
             "The team list could not be loaded."
         )
-        st.code(str(error))
+
+        st.code(
+            str(error)
+        )
+
         st.stop()
 
     teacher_team_names = [
@@ -3407,11 +3553,7 @@ if mode == "Teacher Assignment Builder":
     with col2:
         teacher_sample = st.selectbox(
             "Sample size",
-            [
-                10,
-                15,
-                20,
-            ],
+            SAMPLE_OPTIONS,
             index=2,
         )
 
@@ -3447,26 +3589,28 @@ if mode == "Teacher Assignment Builder":
         payload = {
             "sport":
                 teacher_sport,
+
             "team":
                 teacher_team,
+
             "season":
                 teacher_season,
+
             "variable":
                 teacher_variable,
+
             "sample":
                 teacher_sample,
         }
-
-        code = encode_task(
-            payload
-        )
 
         st.success(
             "Assignment code created."
         )
 
         st.code(
-            code,
+            encode_task(
+                payload
+            ),
             language=None,
         )
 
@@ -3488,7 +3632,8 @@ st.subheader(
 
 task_code = st.text_input(
     "Have an assignment code? Paste it here (optional).",
-    placeholder="Paste teacher code here",
+    placeholder=
+        "Paste teacher code here",
 )
 
 
@@ -3505,10 +3650,6 @@ if task_code.strip():
         )
 
 
-# ----------------------------
-# SPORT
-# ----------------------------
-
 default_sport = (
     preset.get(
         "sport",
@@ -3517,6 +3658,7 @@ default_sport = (
     if preset
     else "NBA"
 )
+
 
 if default_sport not in SPORTS:
     default_sport = "NBA"
@@ -3532,13 +3674,10 @@ sport = st.selectbox(
 )
 
 
-# ----------------------------
-# SEASON
-# ----------------------------
-
 season_options = SEASONS[
     sport
 ]
+
 
 default_season = (
     preset.get(
@@ -3549,8 +3688,14 @@ default_season = (
     else season_options[0]
 )
 
-if default_season not in season_options:
-    default_season = season_options[0]
+
+if (
+    default_season
+    not in season_options
+):
+    default_season = (
+        season_options[0]
+    )
 
 
 season = st.selectbox(
@@ -3563,10 +3708,6 @@ season = st.selectbox(
 )
 
 
-# ----------------------------
-# TEAMS
-# ----------------------------
-
 try:
     teams = teams_for(
         sport,
@@ -3577,7 +3718,11 @@ except Exception as error:
     st.error(
         "The team list could not be loaded."
     )
-    st.code(str(error))
+
+    st.code(
+        str(error)
+    )
+
     st.stop()
 
 
@@ -3585,6 +3730,7 @@ if not teams:
     st.error(
         "No teams were returned for this sport."
     )
+
     st.stop()
 
 
@@ -3593,6 +3739,7 @@ team_names = [
     for team
     in teams
 ]
+
 
 team_map = {
     team["name"]:
@@ -3611,21 +3758,20 @@ default_team = (
     else team_names[0]
 )
 
+
 if default_team not in team_names:
     default_team = team_names[0]
 
-
-# ----------------------------
-# VARIABLES
-# ----------------------------
 
 presets = presets_for(
     sport
 )
 
+
 variable_options = list(
     presets.keys()
 )
+
 
 default_variable = (
     preset.get(
@@ -3636,13 +3782,15 @@ default_variable = (
     else variable_options[0]
 )
 
-if default_variable not in variable_options:
-    default_variable = variable_options[0]
 
+if (
+    default_variable
+    not in variable_options
+):
+    default_variable = (
+        variable_options[0]
+    )
 
-# ----------------------------
-# SAMPLE
-# ----------------------------
 
 default_sample = (
     preset.get(
@@ -3653,15 +3801,17 @@ default_sample = (
     else 20
 )
 
-if default_sample not in [
-    10,
-    15,
-    20,
-]:
+
+if (
+    default_sample
+    not in SAMPLE_OPTIONS
+):
     default_sample = 20
 
 
-col1, col2, col3 = st.columns(3)
+col1, col2, col3 = (
+    st.columns(3)
+)
 
 
 with col1:
@@ -3689,16 +3839,8 @@ with col2:
 with col3:
     sample = st.selectbox(
         "5. Sample",
-        [
-            10,
-            15,
-            20,
-        ],
-        index=[
-            10,
-            15,
-            20,
-        ].index(
+        SAMPLE_OPTIONS,
+        index=SAMPLE_OPTIONS.index(
             default_sample
         ),
         disabled=bool(preset),
@@ -3708,6 +3850,7 @@ with col3:
 cfg = presets[
     variable
 ]
+
 
 team_id = team_map[
     team_name
@@ -3723,9 +3866,11 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
+
 st.write(
     "### Research Question"
 )
+
 
 st.write(
     cfg[
@@ -3736,16 +3881,19 @@ st.write(
     )
 )
 
+
 st.write(
     f"**Variable A:** "
     f"{cfg['a1']} / "
     f"{cfg['a2']}"
 )
 
+
 st.write(
     "**Outcome:** "
     "Win / Did Not Win"
 )
+
 
 st.markdown(
     "</div>",
@@ -3786,6 +3934,7 @@ if not loaded:
     st.info(
         "Choose your investigation and click **Load Game Data**."
     )
+
     st.stop()
 
 
@@ -3802,6 +3951,7 @@ if not loaded:
 loaded_presets = presets_for(
     loaded_sport
 )
+
 
 cfg = loaded_presets[
     loaded_variable
@@ -3836,6 +3986,7 @@ if df.empty:
     st.error(
         "No completed games were found for this selection."
     )
+
     st.stop()
 
 
@@ -3870,6 +4021,7 @@ if df_valid.empty:
     st.error(
         "The statistic needed for this investigation was unavailable for all of the selected games."
     )
+
     st.stop()
 
 
@@ -3886,6 +4038,7 @@ if len(df_valid) < loaded_sample:
 st.write(
     "## Step 1 — Examine the evidence"
 )
+
 
 st.caption(
     "Look at the evidence first. Then decide which category each game belongs in."
@@ -3952,6 +4105,7 @@ editable_table = (
     student_table.copy()
 )
 
+
 editable_table[
     "Your Category"
 ] = ""
@@ -3996,13 +4150,19 @@ edited = st.data_editor(
 if st.button(
     "Check My Classifications"
 ):
-    answers = edited[
-        "Your Category"
-    ].tolist()
+    answers = (
+        edited[
+            "Your Category"
+        ]
+        .tolist()
+    )
 
-    expected = df_valid[
-        "expected_category"
-    ].tolist()
+    expected = (
+        df_valid[
+            "expected_category"
+        ]
+        .tolist()
+    )
 
     correct = [
         answer == correct_answer
@@ -4088,6 +4248,7 @@ category_1_wins = int(
     ]
 )
 
+
 category_1_total = int(
     table.loc[
         cfg["a1"],
@@ -4095,12 +4256,14 @@ category_1_total = int(
     ]
 )
 
+
 category_2_wins = int(
     table.loc[
         cfg["a2"],
         "Win",
     ]
 )
+
 
 category_2_total = int(
     table.loc[
@@ -4124,10 +4287,12 @@ p1 = percent(
     category_1_total,
 )
 
+
 p2 = percent(
     category_2_wins,
     category_2_total,
 )
+
 
 difference = abs(
     p1 - p2
@@ -4276,7 +4441,7 @@ with st.expander(
 
     elif loaded_sport == "NHL":
         st.write(
-            "NHL schedules, box scores, and scoring summaries are retrieved from NHL game data."
+            "NHL schedules, box scores, and play-by-play data are retrieved from NHL game data."
         )
 
     elif loaded_sport == "MLS":
